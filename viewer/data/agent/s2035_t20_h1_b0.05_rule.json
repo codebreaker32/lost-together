@@ -1,0 +1,178 @@
+{
+ "point_id": "s2035_t20_h1_b0.05",
+ "policy": "rule",
+ "decision": "escape",
+ "candidate_id": 0,
+ "why": "evidence 1.98 = map risk 1.86 + unknown 0.66 x w0.60 (static)",
+ "source": "rule",
+ "fallback_reason": null,
+ "evidence": 1.9792,
+ "tool_calls": 3,
+ "llm_calls": 0,
+ "latency_s": 0.150299774999894,
+ "model_latency_s": 0.0,
+ "tokens_in": 0,
+ "tokens_out": 0,
+ "cost_usd": 0.0,
+ "action": "escape",
+ "approval": {
+  "approved": true,
+  "by": "auto",
+  "final_action": "escape",
+  "note": "auto-approved (batch mode)",
+  "wait_s": 0.0
+ },
+ "trace": [
+  {
+   "i": 0,
+   "kind": "observe",
+   "t_s": 0.0,
+   "n_candidates": 3,
+   "top": {
+    "id": 0,
+    "cls": "unknown",
+    "score": 0.428,
+    "box": [
+     238,
+     382,
+     71,
+     48
+    ],
+    "source": "blob"
+   },
+   "frame": {
+    "haze": 0.275,
+    "contrast": 0.422,
+    "visibility": 0.725
+   },
+   "detector": "yolox"
+  },
+  {
+   "i": 1,
+   "kind": "tool",
+   "t_s": 0.0001,
+   "name": "query_map",
+   "args": {},
+   "ok": true,
+   "result": {
+    "nearest_exit": null,
+    "n_known_exits": 0,
+    "recent_sightings": [
+     {
+      "distance_m": 43.1,
+      "bearing_deg": 37.8,
+      "age_s": 16.0,
+      "conf": 0.874,
+      "weight": 0.835,
+      "by_hiker": 0
+     },
+     {
+      "distance_m": 11.3,
+      "bearing_deg": 19.7,
+      "age_s": 0.0,
+      "conf": 0.611,
+      "weight": 0.611,
+      "by_hiker": 1
+     },
+     {
+      "distance_m": 118.2,
+      "bearing_deg": 106.9,
+      "age_s": 8.0,
+      "conf": 0.581,
+      "weight": 0.568,
+      "by_hiker": 3
+     },
+     {
+      "distance_m": 146.6,
+      "bearing_deg": 101.6,
+      "age_s": 16.0,
+      "conf": 0.436,
+      "weight": 0.416,
+      "by_hiker": 3
+     },
+     {
+      "distance_m": 60.9,
+      "bearing_deg": 90.5,
+      "age_s": 28.0,
+      "conf": 0.449,
+      "weight": 0.414,
+      "by_hiker": 0
+     }
+    ],
+    "risk_near_hiker": 1.86,
+    "escape_threshold": 0.9,
+    "alert_radius_m": 75.0,
+    "nearest_sighting_m": 11.3,
+    "farthest_teammate_m": 152.3
+   },
+   "by": "rule"
+  },
+  {
+   "i": 2,
+   "kind": "tool",
+   "t_s": 0.132,
+   "name": "look_closer",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "result": {
+    "candidate_id": 0,
+    "zoom": 2.5,
+    "crop_box": [
+     208,
+     341,
+     130,
+     129
+    ],
+    "before": {
+     "cls": "unknown",
+     "score": 0.428
+    },
+    "after": {
+     "cls": "unknown",
+     "score": 0.662,
+     "source": "contrast_on_crop"
+    },
+    "contrast_gain": 1.29,
+    "crop_visibility": {
+     "haze": 0.11,
+     "contrast": 0.426,
+     "visibility": 0.89
+    }
+   },
+   "by": "rule"
+  },
+  {
+   "i": 3,
+   "kind": "tool",
+   "t_s": 0.1503,
+   "name": "compare_frames",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "result": {
+    "candidate_id": 0,
+    "motion_px": 0.0,
+    "background_px": 0.0,
+    "ego_motion_px": [
+     0.0,
+     -0.0
+    ],
+    "direction_deg": -57.9,
+    "moving": false
+   },
+   "by": "rule"
+  },
+  {
+   "i": 4,
+   "kind": "ranger",
+   "outcome": "approved",
+   "autonomy": "advise",
+   "by": "auto",
+   "note": "auto-approved (batch mode)"
+  }
+ ],
+ "story": "#0 unknown 0.43 -> map risk 1.86 -> look_closer -> unknown 0.66 -> compare_frames -> static 0.0px -> ranger: approved -> ESCAPE"
+}

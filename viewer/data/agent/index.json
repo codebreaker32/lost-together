@@ -1,0 +1,33 @@
+{
+ "model": "qwen3-vl:30b-a3b-instruct",
+ "source": "results/agent_bench/tierC_live_{a,b}",
+ "traces": [
+  {
+   "point": "s2035_t20_h1_b0.05",
+   "title": "Looked closer, then ran",
+   "note": "Light fog. The detector listed two 'unknown' blobs (0.43, 0.41) and a faint YOLOX 'bear' (0.16). The agent passed over the higher-scoring blobs, checked the faint bear for motion (1.0 px, which its explanation overstates as 'high motion'), looked closer (bear 0.16 \u2192 0.58) and escaped. The rule escaped too. Truth: a real bear.",
+   "llm": "s2035_t20_h1_b0.05_llm.json",
+   "rule": "s2035_t20_h1_b0.05_rule.json",
+   "frame": "s2035_t20_h1_b0.05.jpg",
+   "prev_frame": "s2035_t20_h1_b0.05_prev.jpg"
+  },
+  {
+   "point": "s2052_t84_h3_b0.05",
+   "title": "A deer, not a bear",
+   "note": "The rule escaped on map risk plus an unknown blob. The agent saw no motion, looked closer (still 'unknown'), and kept going. Truth: a grazing deer, so the agent avoided a false alarm.",
+   "llm": "s2052_t84_h3_b0.05_llm.json",
+   "rule": "s2052_t84_h3_b0.05_rule.json",
+   "frame": "s2052_t84_h3_b0.05.jpg",
+   "prev_frame": "s2052_t84_h3_b0.05_prev.jpg"
+  },
+  {
+   "point": "s2058_t119_h2_b0.1",
+   "title": "Failure in thick fog",
+   "note": "About 39 m visibility. The agent saw no motion, looked closer ('unknown' 0.56) and chose to regroup instead of escaping; the rule also regrouped. Truth: a real bear. In thick fog the agent missed 46 of 66 real threats and the rule missed 27.",
+   "llm": "s2058_t119_h2_b0.1_llm.json",
+   "rule": "s2058_t119_h2_b0.1_rule.json",
+   "frame": "s2058_t119_h2_b0.1.jpg",
+   "prev_frame": "s2058_t119_h2_b0.1_prev.jpg"
+  }
+ ]
+}

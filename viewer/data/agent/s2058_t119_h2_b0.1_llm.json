@@ -1,0 +1,224 @@
+{
+ "point_id": "s2058_t119_h2_b0.1",
+ "policy": "llm",
+ "decision": "regroup",
+ "candidate_id": 0,
+ "why": "Low-confidence detection with no motion; map shows high-risk sighting nearby, warranting team regrouping.",
+ "source": "llm",
+ "fallback_reason": null,
+ "evidence": null,
+ "tool_calls": 3,
+ "llm_calls": 4,
+ "latency_s": 5.1858896889998505,
+ "model_latency_s": 5.026717747999555,
+ "tokens_in": 10695,
+ "tokens_out": 100,
+ "cost_usd": 0.0031207539352163904,
+ "action": "regroup",
+ "approval": null,
+ "trace": [
+  {
+   "i": 0,
+   "kind": "observe",
+   "t_s": 0.0,
+   "n_candidates": 1,
+   "top": {
+    "id": 0,
+    "cls": "unknown",
+    "score": 0.313,
+    "box": [
+     2,
+     305,
+     191,
+     131
+    ],
+    "source": "blob"
+   },
+   "frame": {
+    "haze": 0.263,
+    "contrast": 0.491,
+    "visibility": 0.737
+   },
+   "detector": "yolox",
+   "candidates": [
+    {
+     "id": 0,
+     "cls": "unknown",
+     "score": 0.313,
+     "box": [
+      2,
+      305,
+      191,
+      131
+     ],
+     "source": "blob"
+    }
+   ],
+   "image": null
+  },
+  {
+   "i": 1,
+   "kind": "llm",
+   "t_s": 1.102,
+   "ok": true,
+   "latency_s": 1.0997,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 2038,
+   "tokens_out": 21,
+   "tool_calls": [
+    "compare_frames"
+   ],
+   "content": ""
+  },
+  {
+   "i": 2,
+   "kind": "tool",
+   "t_s": 1.1198,
+   "name": "compare_frames",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "latency_s": 0.0178,
+   "result": {
+    "candidate_id": 0,
+    "motion_px": 0.0,
+    "background_px": 0.0,
+    "ego_motion_px": [
+     0.0,
+     0.0
+    ],
+    "direction_deg": -173.4,
+    "moving": false
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 3,
+   "kind": "llm",
+   "t_s": 1.7551,
+   "ok": true,
+   "latency_s": 0.6346,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 2127,
+   "tokens_out": 22,
+   "tool_calls": [
+    "look_closer"
+   ],
+   "content": ""
+  },
+  {
+   "i": 4,
+   "kind": "tool",
+   "t_s": 1.8901,
+   "name": "look_closer",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "latency_s": 0.135,
+   "result": {
+    "candidate_id": 0,
+    "zoom": 1.59,
+    "crop_box": [
+     0,
+     209,
+     258,
+     322
+    ],
+    "before": {
+     "cls": "unknown",
+     "score": 0.313
+    },
+    "after": {
+     "cls": "unknown",
+     "score": 0.56,
+     "source": "contrast_on_crop"
+    },
+    "contrast_gain": 1.27,
+    "crop_visibility": {
+     "haze": 0.216,
+     "contrast": 0.421,
+     "visibility": 0.784
+    }
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 5,
+   "kind": "llm",
+   "t_s": 2.9467,
+   "ok": true,
+   "latency_s": 1.0544,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 3340,
+   "tokens_out": 16,
+   "tool_calls": [
+    "query_map"
+   ],
+   "content": ""
+  },
+  {
+   "i": 6,
+   "kind": "tool",
+   "t_s": 2.9467,
+   "name": "query_map",
+   "args": {},
+   "ok": true,
+   "latency_s": 0.0,
+   "result": {
+    "nearest_exit": null,
+    "n_known_exits": 0,
+    "recent_sightings": [
+     {
+      "distance_m": 9.2,
+      "bearing_deg": 354.1,
+      "age_s": 0.0,
+      "conf": 0.732,
+      "weight": 0.732,
+      "by_hiker": 2
+     }
+    ],
+    "risk_near_hiker": 0.732,
+    "escape_threshold": 0.9,
+    "alert_radius_m": 75.0,
+    "nearest_sighting_m": 9.2,
+    "farthest_teammate_m": 263.2
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 7,
+   "kind": "llm",
+   "t_s": 5.1859,
+   "ok": true,
+   "latency_s": 2.238,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 3190,
+   "tokens_out": 41,
+   "tool_calls": [],
+   "content": "{\"decision\": \"regroup\", \"candidate_id\": 0, \"why\": \"Low-confidence detection with no motion; map shows high-risk sighting nearby, warranting team regrouping.\"}"
+  },
+  {
+   "i": 8,
+   "kind": "validate",
+   "t_s": 5.1859,
+   "ok": true,
+   "error": null
+  },
+  {
+   "i": 9,
+   "kind": "ranger",
+   "outcome": "pass-through",
+   "autonomy": "advise"
+  }
+ ],
+ "story": "#0 unknown 0.31 -> compare_frames -> static 0.0px -> look_closer -> unknown 0.56 -> map risk 0.73 -> ranger: pass-through -> REGROUP"
+}

@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "IamRead", "Effect": "Allow", "Action": ["iam:Get*", "iam:List*"], "Resource": "*"},
+    {"Sid": "ProjectRolesAndPolicies", "Effect": "Allow",
+     "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:TagRole", "iam:UntagRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
+                "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole",
+                "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile", "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile", "iam:TagInstanceProfile",
+                "iam:CreatePolicy", "iam:DeletePolicy", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:TagPolicy"],
+     "Resource": ["arn:aws:iam::ACCOUNT_ID:role/lost-together-*", "arn:aws:iam::ACCOUNT_ID:role/cdk-*", "arn:aws:iam::ACCOUNT_ID:role/service-role/*",
+                  "arn:aws:iam::ACCOUNT_ID:instance-profile/lost-together-*", "arn:aws:iam::ACCOUNT_ID:policy/lost-together-*", "arn:aws:iam::ACCOUNT_ID:policy/service-role/*"]},
+    {"Sid": "ServiceLinkedRoles", "Effect": "Allow", "Action": "iam:CreateServiceLinkedRole", "Resource": "*"},
+    {"Sid": "NoAdminEscalation", "Effect": "Deny", "Action": ["iam:AttachRolePolicy", "iam:AttachUserPolicy", "iam:AttachGroupPolicy"], "Resource": "*",
+     "Condition": {"ArnEquals": {"iam:PolicyARN": ["arn:aws:iam::aws:policy/AdministratorAccess", "arn:aws:iam::aws:policy/IAMFullAccess", "arn:aws:iam::aws:policy/PowerUserAccess"]}}}
+  ]
+}

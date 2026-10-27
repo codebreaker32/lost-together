@@ -1,0 +1,138 @@
+{
+ "point_id": "s2058_t119_h2_b0.1",
+ "policy": "rule",
+ "decision": "regroup",
+ "candidate_id": 0,
+ "why": "evidence 0.83 = map risk 0.73 + unknown 0.56 x w0.60 (static)",
+ "source": "rule",
+ "fallback_reason": null,
+ "evidence": 0.8328,
+ "tool_calls": 3,
+ "llm_calls": 0,
+ "latency_s": 0.15366687799996726,
+ "model_latency_s": 0.0,
+ "tokens_in": 0,
+ "tokens_out": 0,
+ "cost_usd": 0.0,
+ "action": "regroup",
+ "approval": null,
+ "trace": [
+  {
+   "i": 0,
+   "kind": "observe",
+   "t_s": 0.0,
+   "n_candidates": 1,
+   "top": {
+    "id": 0,
+    "cls": "unknown",
+    "score": 0.313,
+    "box": [
+     2,
+     305,
+     191,
+     131
+    ],
+    "source": "blob"
+   },
+   "frame": {
+    "haze": 0.263,
+    "contrast": 0.491,
+    "visibility": 0.737
+   },
+   "detector": "yolox"
+  },
+  {
+   "i": 1,
+   "kind": "tool",
+   "t_s": 0.0,
+   "name": "query_map",
+   "args": {},
+   "ok": true,
+   "result": {
+    "nearest_exit": null,
+    "n_known_exits": 0,
+    "recent_sightings": [
+     {
+      "distance_m": 9.2,
+      "bearing_deg": 354.1,
+      "age_s": 0.0,
+      "conf": 0.732,
+      "weight": 0.732,
+      "by_hiker": 2
+     }
+    ],
+    "risk_near_hiker": 0.732,
+    "escape_threshold": 0.9,
+    "alert_radius_m": 75.0,
+    "nearest_sighting_m": 9.2,
+    "farthest_teammate_m": 263.2
+   },
+   "by": "rule"
+  },
+  {
+   "i": 2,
+   "kind": "tool",
+   "t_s": 0.135,
+   "name": "look_closer",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "result": {
+    "candidate_id": 0,
+    "zoom": 1.59,
+    "crop_box": [
+     0,
+     209,
+     258,
+     322
+    ],
+    "before": {
+     "cls": "unknown",
+     "score": 0.313
+    },
+    "after": {
+     "cls": "unknown",
+     "score": 0.56,
+     "source": "contrast_on_crop"
+    },
+    "contrast_gain": 1.27,
+    "crop_visibility": {
+     "haze": 0.216,
+     "contrast": 0.421,
+     "visibility": 0.784
+    }
+   },
+   "by": "rule"
+  },
+  {
+   "i": 3,
+   "kind": "tool",
+   "t_s": 0.1537,
+   "name": "compare_frames",
+   "args": {
+    "candidate_id": 0
+   },
+   "ok": true,
+   "result": {
+    "candidate_id": 0,
+    "motion_px": 0.0,
+    "background_px": 0.0,
+    "ego_motion_px": [
+     0.0,
+     0.0
+    ],
+    "direction_deg": -173.4,
+    "moving": false
+   },
+   "by": "rule"
+  },
+  {
+   "i": 4,
+   "kind": "ranger",
+   "outcome": "pass-through",
+   "autonomy": "advise"
+  }
+ ],
+ "story": "#0 unknown 0.31 -> map risk 0.73 -> look_closer -> unknown 0.56 -> compare_frames -> static 0.0px -> ranger: pass-through -> REGROUP"
+}

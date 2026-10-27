@@ -1,0 +1,25 @@
+[project]
+name = "lost-together"
+version = "0.1.0"
+description = "Lost hikers share a living map built from what each of them sees while an uncertain predator hunts them (OpenCV AI Competition 2026)."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "matplotlib>=3.9",
+    "opencv-python==5.0.0.93",
+    "mcp>=2.3.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lost_together"]

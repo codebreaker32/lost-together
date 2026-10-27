@@ -1,0 +1,288 @@
+{
+ "point_id": "s2035_t20_h1_b0.05",
+ "policy": "llm",
+ "decision": "escape",
+ "candidate_id": 2,
+ "why": "Confirmed bear with high motion and score after closer inspection; proximity to hiker and recent sightings warrant immediate evacuation.",
+ "source": "llm",
+ "fallback_reason": null,
+ "evidence": null,
+ "tool_calls": 3,
+ "llm_calls": 4,
+ "latency_s": 6.955154421000316,
+ "model_latency_s": 6.800782297000751,
+ "tokens_in": 11774,
+ "tokens_out": 100,
+ "cost_usd": 0.004222152342721299,
+ "action": "escape",
+ "approval": {
+  "approved": true,
+  "by": "auto",
+  "final_action": "escape",
+  "note": "auto-approved (batch mode)",
+  "wait_s": 0.0
+ },
+ "trace": [
+  {
+   "i": 0,
+   "kind": "observe",
+   "t_s": 0.0,
+   "n_candidates": 3,
+   "top": {
+    "id": 0,
+    "cls": "unknown",
+    "score": 0.428,
+    "box": [
+     238,
+     382,
+     71,
+     48
+    ],
+    "source": "blob"
+   },
+   "frame": {
+    "haze": 0.275,
+    "contrast": 0.422,
+    "visibility": 0.725
+   },
+   "detector": "yolox",
+   "candidates": [
+    {
+     "id": 0,
+     "cls": "unknown",
+     "score": 0.428,
+     "box": [
+      238,
+      382,
+      71,
+      48
+     ],
+     "source": "blob"
+    },
+    {
+     "id": 1,
+     "cls": "unknown",
+     "score": 0.408,
+     "box": [
+      137,
+      351,
+      74,
+      40
+     ],
+     "source": "blob"
+    },
+    {
+     "id": 2,
+     "cls": "bear",
+     "score": 0.158,
+     "box": [
+      357,
+      308,
+      40,
+      29
+     ],
+     "source": "yolox_low"
+    }
+   ],
+   "image": null
+  },
+  {
+   "i": 1,
+   "kind": "llm",
+   "t_s": 1.0508,
+   "ok": true,
+   "latency_s": 1.0482,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 2379,
+   "tokens_out": 16,
+   "tool_calls": [
+    "query_map"
+   ],
+   "content": ""
+  },
+  {
+   "i": 2,
+   "kind": "tool",
+   "t_s": 1.0508,
+   "name": "query_map",
+   "args": {},
+   "ok": true,
+   "latency_s": 0.0001,
+   "result": {
+    "nearest_exit": null,
+    "n_known_exits": 0,
+    "recent_sightings": [
+     {
+      "distance_m": 43.1,
+      "bearing_deg": 37.8,
+      "age_s": 16.0,
+      "conf": 0.874,
+      "weight": 0.835,
+      "by_hiker": 0
+     },
+     {
+      "distance_m": 11.3,
+      "bearing_deg": 19.7,
+      "age_s": 0.0,
+      "conf": 0.611,
+      "weight": 0.611,
+      "by_hiker": 1
+     },
+     {
+      "distance_m": 118.2,
+      "bearing_deg": 106.9,
+      "age_s": 8.0,
+      "conf": 0.581,
+      "weight": 0.568,
+      "by_hiker": 3
+     },
+     {
+      "distance_m": 146.6,
+      "bearing_deg": 101.6,
+      "age_s": 16.0,
+      "conf": 0.436,
+      "weight": 0.416,
+      "by_hiker": 3
+     },
+     {
+      "distance_m": 60.9,
+      "bearing_deg": 90.5,
+      "age_s": 28.0,
+      "conf": 0.449,
+      "weight": 0.414,
+      "by_hiker": 0
+     }
+    ],
+    "risk_near_hiker": 1.86,
+    "escape_threshold": 0.9,
+    "alert_radius_m": 75.0,
+    "nearest_sighting_m": 11.3,
+    "farthest_teammate_m": 152.3
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 3,
+   "kind": "llm",
+   "t_s": 1.7919,
+   "ok": true,
+   "latency_s": 0.7404,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 2779,
+   "tokens_out": 21,
+   "tool_calls": [
+    "compare_frames"
+   ],
+   "content": ""
+  },
+  {
+   "i": 4,
+   "kind": "tool",
+   "t_s": 1.8096,
+   "name": "compare_frames",
+   "args": {
+    "candidate_id": 2
+   },
+   "ok": true,
+   "latency_s": 0.0177,
+   "result": {
+    "candidate_id": 2,
+    "motion_px": 1.01,
+    "background_px": 0.0,
+    "ego_motion_px": [
+     0.0,
+     -0.0
+    ],
+    "direction_deg": -87.7,
+    "moving": true
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 5,
+   "kind": "llm",
+   "t_s": 2.5445,
+   "ok": true,
+   "latency_s": 0.7342,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 2868,
+   "tokens_out": 22,
+   "tool_calls": [
+    "look_closer"
+   ],
+   "content": ""
+  },
+  {
+   "i": 6,
+   "kind": "tool",
+   "t_s": 2.6761,
+   "name": "look_closer",
+   "args": {
+    "candidate_id": 2
+   },
+   "ok": true,
+   "latency_s": 0.1316,
+   "result": {
+    "candidate_id": 2,
+    "zoom": 2.5,
+    "crop_box": [
+     337,
+     282,
+     80,
+     80
+    ],
+    "before": {
+     "cls": "bear",
+     "score": 0.158
+    },
+    "after": {
+     "cls": "bear",
+     "score": 0.584,
+     "source": "yolox_on_crop"
+    },
+    "contrast_gain": 1.91,
+    "crop_visibility": {
+     "haze": 0.373,
+     "contrast": 0.268,
+     "visibility": 0.627
+    }
+   },
+   "image": null,
+   "by": "llm"
+  },
+  {
+   "i": 7,
+   "kind": "llm",
+   "t_s": 6.9551,
+   "ok": true,
+   "latency_s": 4.278,
+   "cached": false,
+   "attempts": 1,
+   "tokens_in": 3748,
+   "tokens_out": 41,
+   "tool_calls": [],
+   "content": "{\"decision\": \"escape\", \"candidate_id\": 2, \"why\": \"Confirmed bear with high motion and score after closer inspection; proximity to hiker and recent sightings warrant immediate evacuation.\"}"
+  },
+  {
+   "i": 8,
+   "kind": "validate",
+   "t_s": 6.9551,
+   "ok": true,
+   "error": null
+  },
+  {
+   "i": 9,
+   "kind": "ranger",
+   "outcome": "approved",
+   "autonomy": "advise",
+   "by": "auto",
+   "note": "auto-approved (batch mode)"
+  }
+ ],
+ "story": "#0 unknown 0.43 -> map risk 1.86 -> compare_frames(#2) -> moving 1.0px -> look_closer(#2) -> bear 0.16 => bear 0.58 -> ranger: approved -> ESCAPE"
+}

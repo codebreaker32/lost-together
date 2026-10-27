@@ -1,0 +1,235 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 875" width="1200" height="875" role="img" aria-labelledby="t d">
+  <title id="t">Lost Together architecture</title>
+  <desc id="d">Forest frames feed OpenCV 5 perception, which builds per-hiker maps that merge into a shared living map. A rule planner decides every step; an LLM hiker agent decides uncertain events through an OpenCV 5 MCP tool server. Actions go to a ranger console. A separate evaluator holds ground truth. AWS: a Graviton sweep instance, S3, CloudWatch and IAM in the default account; a GPU instance running Ollama in the GPU account.</desc>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2d3748"/>
+    </marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a6d00"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1a202c; }
+      .h { font-size: 15px; font-weight: 700; }
+      .b { font-size: 12.5px; }
+      .s { font-size: 11.5px; fill: #4a5568; }
+      .lbl { font-size: 11.5px; fill: #2d3748; font-style: italic; }
+      .mono { font-family: Consolas, "DejaVu Sans Mono", Menlo, monospace; font-size: 12px; }
+      .title { font-size: 20px; font-weight: 700; }
+      .sub { font-size: 12.5px; fill: #4a5568; }
+      .line { stroke: #2d3748; stroke-width: 1.6; fill: none; }
+      .gold { stroke: #8a6d00; stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; }
+      .dot { stroke: #6b46c1; stroke-width: 1.4; fill: none; stroke-dasharray: 2 4; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="875" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="20" y="26" class="title">Lost Together: how one decision is made</text>
+  <text x="1180" y="26" class="sub" text-anchor="end">solid border = built and run · dashed border = pending or planned</text>
+
+  <!-- Feedback loop: actions move hikers -->
+  <path class="line" d="M1035,74 L1035,50 L112,50 L112,70" marker-end="url(#ah)"/>
+  <rect x="440" y="41" width="320" height="18" fill="#ffffff"/>
+  <text x="600" y="54" class="lbl" text-anchor="middle">actions move the hikers (walk / turn) → next camera views</text>
+
+  <!-- Row A -->
+  <!-- 1 Forest frames -->
+  <rect x="20" y="70" width="185" height="200" rx="10" fill="#eef2f6" stroke="#4a5568" stroke-width="1.5"/>
+  <text x="32" y="94" class="h">Forest frames</text>
+  <text x="32" y="116" class="b">TartanGround ForestEnv</text>
+  <text x="32" y="133" class="b">stereo 640×640, B 0.25 m</text>
+  <text x="32" y="150" class="b">+ ground-truth depth</text>
+  <text x="32" y="172" class="b">bear / deer / dog / hiker</text>
+  <text x="32" y="189" class="b">cut-outs composited with</text>
+  <text x="32" y="206" class="b">depth occlusion</text>
+  <text x="32" y="228" class="b">fog: I = J·e^(−βd)</text>
+  <text x="32" y="245" class="b">     + A·(1 − e^(−βd))</text>
+  <text x="32" y="262" class="s">CC BY 4.0</text>
+
+  <!-- 2 Perception -->
+  <rect x="225" y="70" width="235" height="200" rx="10" fill="#e8f1fb" stroke="#2b6cb0" stroke-width="1.5"/>
+  <text x="237" y="94" class="h">Perception · OpenCV 5</text>
+  <text x="237" y="116" class="b">YOLOX-s on dnn ENGINE_NEW</text>
+  <text x="237" y="133" class="b">+ NMSBoxes, dark-blob pass</text>
+  <text x="237" y="155" class="b">StereoSGBM depth (3-way)</text>
+  <text x="237" y="177" class="b">ptcloud Odometry RGB_DEPTH,</text>
+  <text x="237" y="194" class="b">checked by ORB features +</text>
+  <text x="237" y="211" class="b">solvePnPRansac</text>
+  <text x="237" y="233" class="b">dark-channel haze estimate</text>
+  <text x="237" y="255" class="s">all pixel work is OpenCV 5.0.0</text>
+
+  <!-- 3 Per-hiker maps -->
+  <rect x="480" y="70" width="170" height="200" rx="10" fill="#e9f6ee" stroke="#2f855a" stroke-width="1.5"/>
+  <text x="492" y="94" class="h">Hiker maps ×4</text>
+  <text x="492" y="116" class="b">cells seen, exits,</text>
+  <text x="492" y="133" class="b">predator sightings</text>
+  <text x="492" y="150" class="b">with confidence</text>
+  <text x="492" y="172" class="b">pose from odometry +</text>
+  <text x="492" y="189" class="b">dead-reckoning drift</text>
+  <text x="492" y="211" class="b">hikers see only</text>
+  <text x="492" y="228" class="b">Observations, never</text>
+  <text x="492" y="245" class="b">the world</text>
+
+  <!-- 4 Shared living map -->
+  <rect x="670" y="70" width="195" height="200" rx="10" fill="#dff1e6" stroke="#2f855a" stroke-width="2.2"/>
+  <text x="682" y="94" class="h">Shared living map</text>
+  <text x="682" y="116" class="b">merged at the shared</text>
+  <text x="682" y="133" class="b">trailhead start pose</text>
+  <text x="682" y="155" class="b">predator-risk heatmap;</text>
+  <text x="682" y="172" class="b">old evidence fades</text>
+  <text x="682" y="194" class="b">conditions compared:</text>
+  <text x="682" y="211" class="mono">solo · sightings · map</text>
+  <text x="682" y="228" class="mono">share · group</text>
+  <text x="682" y="255" class="s">optional radio range limit</text>
+
+  <!-- Row A arrows -->
+  <line class="line" x1="205" y1="170" x2="223" y2="170" marker-end="url(#ah)"/>
+  <line class="line" x1="460" y1="170" x2="478" y2="170" marker-end="url(#ah)"/>
+  <line class="line" x1="650" y1="170" x2="668" y2="170" marker-end="url(#ah)"/>
+  <line class="line" x1="865" y1="150" x2="888" y2="150" marker-end="url(#ah)"/>
+
+  <!-- 5 Decide column -->
+  <rect x="890" y="70" width="290" height="400" rx="10" fill="#f4f0fc" stroke="#6b46c1" stroke-width="1.5"/>
+  <text x="902" y="94" class="h">Decide</text>
+  <text x="968" y="94" class="s">same triggers, same actions</text>
+
+  <rect x="902" y="104" width="266" height="64" rx="7" fill="#ffffff" stroke="#6b46c1" stroke-width="1.2"/>
+  <text x="914" y="124" class="b" font-weight="700">Rule planner · every step</text>
+  <text x="914" y="142" class="b">route to an exit, avoid risk;</text>
+  <text x="914" y="159" class="b">look again if confidence 0.25–0.75</text>
+
+  <rect x="902" y="178" width="266" height="104" rx="7" fill="#ffffff" stroke="#6b46c1" stroke-width="1.2"/>
+  <text x="914" y="198" class="b" font-weight="700">LLM hiker agent · uncertain events</text>
+  <text x="914" y="216" class="b">qwen3-vl:30b on Ollama (GPU box)</text>
+  <text x="914" y="233" class="b">≤ 3 tool turns → strict JSON</text>
+  <text x="914" y="250" class="b">calls cached by request hash</text>
+  <text x="914" y="267" class="b">any failure → rule decision</text>
+
+  <!-- agent <-> MCP -->
+  <line class="line" x1="1035" y1="284" x2="1035" y2="306" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="1043" y="300" class="lbl">tool calls ⇄ results</text>
+
+  <rect x="902" y="308" width="266" height="152" rx="7" fill="#e8f1fb" stroke="#2b6cb0" stroke-width="1.2"/>
+  <text x="914" y="328" class="b" font-weight="700">OpenCV 5 MCP server (stdio)</text>
+  <text x="914" y="348" class="mono">detect_candidates</text>
+  <text x="914" y="366" class="mono">look_closer</text>
+  <text x="1006" y="366" class="s">defog + CLAHE + re-detect</text>
+  <text x="914" y="384" class="mono">compare_frames</text>
+  <text x="1031" y="384" class="s">Farneback flow</text>
+  <text x="914" y="402" class="mono">query_map</text>
+  <text x="992" y="402" class="s">exits, sightings, risk</text>
+  <text x="914" y="424" class="b">takes candidate IDs, not pixels;</text>
+  <text x="914" y="441" class="b">reads frames only under data/, results/</text>
+
+  <!-- Decide -> Actions -->
+  <line class="line" x1="1035" y1="470" x2="1035" y2="488" marker-end="url(#ah)"/>
+
+  <!-- 6 Actions + ranger -->
+  <rect x="890" y="490" width="290" height="110" rx="10" fill="#fdf1e6" stroke="#c05621" stroke-width="1.5"/>
+  <text x="902" y="513" class="h">Actions · ranger console</text>
+  <text x="902" y="533" class="mono">keep_going · look_again</text>
+  <text x="902" y="550" class="mono">regroup · escape</text>
+  <text x="902" y="570" class="b">advise: a person approves or overrides</text>
+  <text x="902" y="587" class="b">the escape broadcast · act: it runs</text>
+
+  <!-- Evaluator -->
+  <rect x="20" y="300" width="435" height="300" rx="10" fill="#fbf7e6" stroke="#8a6d00" stroke-width="2.2"/>
+  <text x="32" y="324" class="h">Evaluator · the only holder of ground truth</text>
+  <text x="32" y="348" class="b">world, true predator position, which sightings were real</text>
+  <text x="32" y="368" class="b">Hikers and the agent never read it (a unit test enforces this).</text>
+  <text x="32" y="396" class="b" font-weight="700">Scores, paired by seed</text>
+  <text x="32" y="416" class="b">· share of hikers who reach an exit in 40 min</text>
+  <text x="32" y="434" class="b">· every hiker out, closest approach</text>
+  <text x="32" y="452" class="b">· false-alarm escapes, late escapes, McNemar test</text>
+  <text x="32" y="480" class="b" font-weight="700">Outputs</text>
+  <text x="32" y="500" class="b">results/*.csv + run args (*.json) → figures, CI tables</text>
+  <text x="32" y="518" class="b">replay viewer (static page, evaluator's view)</text>
+  <text x="32" y="536" class="b">agent traces, ranger log</text>
+
+  <!-- frames -> evaluator -->
+  <line class="gold" x1="112" y1="270" x2="112" y2="298" marker-end="url(#ahg)"/>
+  <text x="120" y="290" class="lbl">ground truth</text>
+
+  <!-- Calibration -->
+  <rect x="480" y="300" width="385" height="170" rx="10" fill="#e8f1fb" stroke="#2b6cb0" stroke-width="1.5" stroke-dasharray="7 4"/>
+  <text x="492" y="324" class="h">Tier A calibration (running)</text>
+  <text x="492" y="346" class="b">YOLOX on composited, fogged frames:</text>
+  <text x="492" y="364" class="b">P(detect bear | distance 5–60 m, fog β 0–0.2)</text>
+  <text x="492" y="382" class="b">decoy rates (deer, dog) and false "bear" per frame</text>
+  <text x="492" y="404" class="b">→ calibrated perception model, so 10⁵-episode</text>
+  <text x="492" y="422" class="b">sweeps cost milliseconds per episode</text>
+  <text x="492" y="450" class="s">v0 sweeps used a guessed noise model</text>
+
+  <!-- perception -> calibration, calibration -> per-hiker maps -->
+  <path class="line" d="M440,270 L440,285 L520,285 L520,298" marker-end="url(#ah)"/>
+  <line class="line" x1="600" y1="300" x2="600" y2="272" marker-end="url(#ah)"/>
+  <text x="608" y="292" class="lbl">used in sweeps</text>
+
+  <!-- actions -> evaluator -->
+  <line class="gold" x1="888" y1="560" x2="457" y2="560" marker-end="url(#ahg)"/>
+  <rect x="540" y="540" width="270" height="16" fill="#ffffff"/>
+  <text x="675" y="552" class="lbl" text-anchor="middle">decisions and outcomes are scored</text>
+
+  <!-- AWS band -->
+  <rect x="20" y="630" width="1160" height="190" rx="12" fill="#f3f5f8" stroke="#5a6775" stroke-width="1.5"/>
+  <text x="36" y="654" class="h">AWS · ap-south-1 (Mumbai)</text>
+  <text x="290" y="654" class="s">two accounts, split by rule: GPU work only on the GPU account</text>
+
+  <!-- default account -->
+  <rect x="32" y="664" width="770" height="146" rx="9" fill="#ffffff" stroke="#8a96a3" stroke-width="1.2"/>
+  <text x="44" y="684" class="b" font-weight="700">Default account (…8661)</text>
+
+  <rect x="44" y="694" width="190" height="106" rx="7" fill="#fff8ec" stroke="#c05621" stroke-width="1.2"/>
+  <text x="54" y="713" class="b" font-weight="700">EC2 c8g.2xlarge</text>
+  <text x="54" y="731" class="b">Graviton, 8 vCPU</text>
+  <text x="54" y="748" class="b">Tier A sweeps, ~60 ep/s</text>
+  <text x="54" y="765" class="b">~$0.22/h</text>
+  <text x="54" y="782" class="s">self-terminates after 4 h</text>
+
+  <rect x="244" y="694" width="150" height="106" rx="7" fill="#eef7ee" stroke="#2f855a" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="254" y="713" class="b" font-weight="700">S3 (private)</text>
+  <text x="254" y="731" class="b">results files</text>
+  <text x="254" y="748" class="b">replay viewer</text>
+  <text x="254" y="765" class="b">private, SSE-S3</text>
+  <text x="254" y="782" class="s">deploys with site stack</text>
+
+  <rect x="404" y="694" width="150" height="106" rx="7" fill="#ffffff" stroke="#5a6775" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="414" y="713" class="b" font-weight="700">CloudFront + OAC</text>
+  <text x="414" y="731" class="b">HTTPS URL for</text>
+  <text x="414" y="748" class="b">judges (template)</text>
+  <text x="414" y="765" class="s">blocked until AWS</text>
+  <text x="414" y="782" class="s">verifies the account</text>
+
+  <rect x="564" y="694" width="112" height="106" rx="7" fill="#fdf1f4" stroke="#b83280" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="574" y="713" class="b" font-weight="700">CloudWatch</text>
+  <text x="574" y="731" class="b">LostTogether</text>
+  <text x="574" y="748" class="b">metrics and</text>
+  <text x="574" y="765" class="b">dashboard</text>
+  <text x="574" y="782" class="s">publisher built</text>
+
+  <rect x="686" y="694" width="106" height="106" rx="7" fill="#f4f0fc" stroke="#6b46c1" stroke-width="1.2"/>
+  <text x="696" y="713" class="b" font-weight="700">IAM</text>
+  <text x="696" y="731" class="b">scoped user on</text>
+  <text x="696" y="748" class="b">GPU account;</text>
+  <text x="696" y="765" class="s">default account:</text>
+  <text x="696" y="782" class="s">root keys (to fix)</text>
+
+  <!-- GPU account -->
+  <rect x="814" y="664" width="354" height="146" rx="9" fill="#ffffff" stroke="#8a96a3" stroke-width="1.2"/>
+  <text x="826" y="684" class="b" font-weight="700">GPU account (…0916)</text>
+  <rect x="826" y="694" width="330" height="106" rx="7" fill="#f4f0fc" stroke="#6b46c1" stroke-width="1.2"/>
+  <text x="836" y="713" class="b" font-weight="700">EC2 g6e.xlarge · NVIDIA L40S 48 GB</text>
+  <text x="836" y="731" class="b">Ollama serving qwen3-vl:30b, thinking off</text>
+  <text x="836" y="748" class="b">reached only through an SSH tunnel</text>
+  <text x="836" y="765" class="b">$2.235/h · $10 total cap · AWS Budgets alerts</text>
+  <text x="836" y="782" class="b">stopped after each batch + auto-shutdown</text>
+
+  <!-- agent -> GPU connector along the right edge -->
+  <path class="dot" d="M1168,240 L1190,240 L1190,745 L1158,745" marker-end="url(#ah)"/>
+
+  <!-- footer -->
+  <text x="20" y="842" class="s">Planned, not yet verified: the same pipeline on the COOL Graviton AMI (Marketplace subscription pending).</text>
+  <text x="20" y="860" class="s">The closed-loop sweeps use the rule planner; the LLM agent is benchmarked offline on logged decision points.</text>
+</svg>

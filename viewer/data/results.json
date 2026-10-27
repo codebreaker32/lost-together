@@ -1,0 +1,10 @@
+{
+ "headline": [
+  {"label": "Escape rate, solo → shared map", "value": "0.27 → 0.42", "note": "Grid mean over 56 predator settings × 200 seeds, light fog (β = 0.05), calibrated OpenCV perception (tierA_v1)."},
+  {"label": "Cells where sharing helps", "value": "56 / 56", "note": "95% paired-bootstrap CI above 0 at every fog level tested (β = 0, 0.05, 0.1)."},
+  {"label": "Benefit of sharing in thicker fog", "value": "+0.15 → +0.10", "note": "Mean paired Δ escape rate (share − solo) at β = 0.05 vs β = 0.1 (≈78 m vs ≈39 m visibility)."},
+  {"label": "Gap to perfect perception recovered", "value": "56%", "note": "(share − solo) / (share with perfect perception − solo), clear air. Vision is the bottleneck: the detector finds the bear only out to ~15 m."},
+  {"label": "Moving as one group", "value": "−0.07", "note": "group − share, 44/56 cells below 0, none above: groups are easier to sense and lose time gathering."}
+ ],
+ "figure": "results-headline.png"
+}

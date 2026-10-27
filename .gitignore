@@ -1,0 +1,14 @@
+# secrets
+.env
+*.pem
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# generated
+results/
+/data/
+*.egg-info/
+.sweepbox/
+.gpubox/

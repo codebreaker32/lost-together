@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Lost Together · Replay</title>
+<meta name="description" content="The same simulated forest run twice: four hikers who each see through their own camera, OpenCV 5 detections, and a shared living map. Solo against shared, side by side.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/NationalPark-Bold.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="fonts/NationalPark-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="instrument" id="instrument">
+  <header class="band">
+    <a class="wordmark" href="./">Lost Together</a>
+    <p class="runline" id="runline">Loading the replay</p>
+    <div class="pickers" id="pickers">
+      <label class="picker"><span class="side-key">L</span><span class="sr">Left run</span><select id="pickL"></select></label>
+      <label class="picker"><span class="side-key">R</span><span class="sr">Right run</span><select id="pickR"></select></label>
+    </div>
+    <button type="button" class="band-btn" id="btnHelp" aria-haspopup="dialog" aria-keyshortcuts="?">Keys</button>
+  </header>
+
+  <main class="board" id="board">
+    <section class="run" id="paneL" aria-label="Left run">
+      <header class="run-head">
+        <h2 class="run-name"><span class="side-key">L</span><span class="pane-label">Run</span></h2>
+        <p class="run-how"></p>
+        <p class="outcome" aria-live="polite"><span class="o-big"></span><span class="o-sub"></span></p>
+      </header>
+      <div class="run-stage">
+        <div class="map-wrap">
+          <canvas class="map" role="img" aria-label="Map of the left run"></canvas>
+          <p class="map-badges"></p>
+          <ol class="toasts" aria-hidden="true"></ol>
+        </div>
+        <figure class="cam">
+          <canvas class="cam-cv" role="img" aria-label="Camera frame"></canvas>
+          <figcaption class="cam-cap"></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="run" id="paneR" aria-label="Right run">
+      <header class="run-head">
+        <h2 class="run-name"><span class="side-key">R</span><span class="pane-label">Run</span></h2>
+        <p class="run-how"></p>
+        <p class="outcome" aria-live="polite"><span class="o-big"></span><span class="o-sub"></span></p>
+      </header>
+      <div class="run-stage">
+        <div class="map-wrap">
+          <canvas class="map" role="img" aria-label="Map of the right run"></canvas>
+          <p class="map-badges"></p>
+          <ol class="toasts" aria-hidden="true"></ol>
+        </div>
+        <figure class="cam">
+          <canvas class="cam-cv" role="img" aria-label="Camera frame"></canvas>
+          <figcaption class="cam-cap"></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Hikers and field log">
+      <section class="verdict" id="verdict" aria-live="polite"></section>
+      <section class="roster-wrap">
+        <h2 class="side-h">Hikers <span class="side-note">choose one to follow its camera</span></h2>
+        <table class="roster" id="roster">
+          <thead><tr><th scope="col">Hiker</th><th scope="col"><span class="side-key">L</span> <span id="rosterL"></span></th><th scope="col"><span class="side-key">R</span> <span id="rosterR"></span></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section class="log-wrap">
+        <h2 class="side-h">Field log
+          <label class="log-opt"><input type="checkbox" id="optSightLog"> every report</label>
+        </h2>
+        <ol class="log" id="log" aria-live="off"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="transport" id="transport">
+    <div class="tp-buttons">
+      <button type="button" class="tbtn" id="btnBack" aria-label="Step back" aria-keyshortcuts="ArrowLeft"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.6v14H6zM20 5v14L9.6 12z"/></svg></button>
+      <button type="button" class="tbtn play" id="btnPlay" aria-label="Play" aria-keyshortcuts="Space"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15L19.5 12z"/></svg></button>
+      <button type="button" class="tbtn" id="btnFwd" aria-label="Step forward" aria-keyshortcuts="ArrowRight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 5H18v14h-2.6zM4 5v14l10.4-7z"/></svg></button>
+    </div>
+    <div class="scrub">
+      <div class="ticks" id="ticks" aria-hidden="true"></div>
+      <input type="range" id="scrub" min="0" max="1" value="0" step="1" aria-label="Time step">
+    </div>
+    <p class="clock"><span id="clockM">0:00</span><span id="clockT">step 0</span></p>
+    <label class="speed"><span class="sr">Playback speed</span>
+      <select id="speed" aria-keyshortcuts="ArrowUp ArrowDown">
+        <option value="3">3 steps/s</option>
+        <option value="6">6 steps/s</option>
+        <option value="10" selected>10 steps/s</option>
+        <option value="20">20 steps/s</option>
+        <option value="40">40 steps/s</option>
+      </select>
+    </label>
+    <button type="button" class="tog" id="optFF" aria-pressed="true" aria-keyshortcuts="F">Skip quiet <span class="ff-ind" id="ffInd" hidden>5×</span></button>
+    <button type="button" class="tog layers-btn" id="btnLayers" aria-expanded="false" aria-controls="layers">Layers</button>
+    <div class="layers" id="layers" role="group" aria-label="Map layers">
+      <button type="button" class="tog" id="optMap" aria-pressed="true" aria-keyshortcuts="M">Living map</button>
+      <button type="button" class="tog" id="optRisk" aria-pressed="false" aria-keyshortcuts="R">Risk</button>
+      <button type="button" class="tog" id="optRing" aria-pressed="true" aria-keyshortcuts="S">Sense ring</button>
+      <button type="button" class="tog" id="optTrail" aria-pressed="true" aria-keyshortcuts="T">Routes</button>
+      <button type="button" class="tog tog-eval" id="optEval" aria-pressed="false" aria-keyshortcuts="E">Evaluator view</button>
+    </div>
+  </footer>
+</div>
+
+<div class="below">
+  <section class="sec findings" id="findings" hidden aria-labelledby="findingsH">
+    <h2 id="findingsH">What the experiment found</h2>
+    <div class="findings-body">
+      <dl class="headline" id="headline"></dl>
+      <figure class="findings-fig" id="findingsFig" hidden><img id="findingsImg" alt=""><figcaption id="findingsCap"></figcaption></figure>
+    </div>
+  </section>
+
+  <section class="sec agent" id="agent" aria-labelledby="agentH">
+    <h2 id="agentH">Agent decisions</h2>
+    <div id="agentBody"></div>
+  </section>
+
+  <section class="sec how" aria-labelledby="howH">
+    <h2 id="howH">How the hikers see and decide</h2>
+    <ol class="pipeline">
+      <li><h3>Each hiker has a camera</h3><p>Every hiker sees the forest through its own 640 × 640 frame: TartanGround forest imagery with the predator or a natural decoy composited at its true distance, and fog added with the scattering model.</p></li>
+      <li><h3>OpenCV 5 finds the predator</h3><p>YOLOX-s runs on the new <code>cv2.dnn</code> engine (ENGINE_NEW). On a full frame it finds the predator out to about 15 m.</p></li>
+      <li><h3>Look closer</h3><p>When a report is uncertain, the hiker re-runs the detector on a 3× zoom tile around it. That confirms or dismisses it out to about 20 to 30 m.</p></li>
+      <li><h3>One living map</h3><p>Hikers who share put every sighting on one map, and old evidence fades. A teammate's report makes a hiker scan with zoom.</p></li>
+      <li><h3>Decide, with a person in the loop</h3><p>A rule-based planner and an LLM agent (qwen3-vl on an AWS GPU, calling OpenCV 5 tools through an MCP server) decide when to escape. An escape order is an evacuation broadcast, so a ranger approves or overrides it.</p></li>
+    </ol>
+  </section>
+
+  <section class="sec legend-sec" aria-labelledby="legendH">
+    <h2 id="legendH">Reading the replay</h2>
+    <div class="legend-cols">
+      <div>
+        <h3>On the map</h3>
+        <ul class="legend" id="legend"></ul>
+      </div>
+      <div>
+        <h3>On the camera</h3>
+        <ul class="legend" id="legendCam"></ul>
+      </div>
+      <div>
+        <h3>Keyboard</h3>
+        <dl class="keys" id="keysInline"></dl>
+      </div>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    <p>Everything on this page is a simulation. Only the evaluator view shows ground truth; the hikers and the agent never see it.</p>
+    <p>Forest frames: TartanGround (CC BY 4.0). Animal cut-outs: public domain, CC0 and CC BY 2.0, listed in the project README. Typeface: National Park (SIL Open Font License, <a href="fonts/OFL.txt">licence</a>).</p>
+  </footer>
+</div>
+
+<dialog class="help" id="help" aria-labelledby="helpH">
+  <h2 id="helpH">Keyboard</h2>
+  <dl class="keys" id="keysDialog"></dl>
+  <p class="help-url">URL options: <code>?left=ID&amp;right=ID&amp;t=0&amp;speed=10&amp;play=1&amp;eval=1&amp;risk=1&amp;reveal=end&amp;ff=0&amp;capture=1&amp;hiker=4</code></p>
+  <form method="dialog"><button class="tbtn wide" type="submit">Close</button></form>
+</dialog>
+<div class="fatal" id="fatal" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Lost Together - public replay viewer and results site. Private S3 bucket (no public
+  access) served only through CloudFront with Origin Access Control, HTTPS-only,
+  security headers. No IAM roles, no compute.
+
+Parameters:
+  Project:
+    Type: String
+    Default: lost-together
+    AllowedPattern: "^[a-z0-9-]{3,30}$"
+    Description: Value of the "project" tag and prefix for resource names.
+  ContentSecurityPolicy:
+    Type: String
+    Description: >-
+      Content-Security-Policy sent with every response. The default allows only this site
+      plus the pinned CDNs the viewer may load scripts/fonts from; tighten it if the viewer
+      inlines everything.
+    Default: >-
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' data: https://fonts.gstatic.com;
+      img-src 'self' data: blob:;
+      media-src 'self' blob:;
+      connect-src 'self';
+      worker-src 'self' blob:;
+      object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';
+      upgrade-insecure-requests
+  PriceClass:
+    Type: String
+    Default: PriceClass_200
+    AllowedValues: [PriceClass_100, PriceClass_200, PriceClass_All]
+    Description: PriceClass_200 includes edge locations in India (judges and team are in/near ap-south-1).
+
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "${Project}-site-${AWS::AccountId}-${AWS::Region}"
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced # ACLs disabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 # SSE-S3; SSE-KMS would need a key policy granting CloudFront
+            BucketKeyEnabled: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: abort-incomplete-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      Tags:
+        - Key: project
+          Value: !Ref Project
+        - Key: component
+          Value: replay-site
+
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-oac"
+        Description: CloudFront-to-S3 SigV4 access for the Lost Together site bucket
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SecurityHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${AWS::StackName}-security-headers"
+        Comment: HSTS, CSP, no sniffing, no framing, strict referrer, no device APIs
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: false
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          XSSProtection: # "X-XSS-Protection: 0" per OWASP; CSP does the real work
+            Protection: false
+            Override: true
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Ref ContentSecurityPolicy
+            Override: true
+        CustomHeadersConfig:
+          Items:
+            - Header: Permissions-Policy
+              Value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+              Override: true
+            - Header: Cross-Origin-Opener-Policy
+              Value: same-origin
+              Override: true
+        RemoveHeadersConfig:
+          Items:
+            - Header: Server
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "${Project} replay viewer and results"
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: !Ref PriceClass
+        Origins:
+          - Id: site-bucket
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: "" # OAC, not the legacy OAI
+        DefaultCacheBehavior:
+          TargetOriginId: site-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+        CustomErrorResponses:
+          # Without s3:ListBucket a missing key comes back as 403; present it as a 404.
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 404
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+      Tags:
+        - Key: project
+          Value: !Ref Project
+        - Key: component
+          Value: replay-site
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontDistributionReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+Outputs:
+  BucketName:
+    Description: Private bucket holding the viewer and results (deploy_site.sh syncs into it)
+    Value: !Ref SiteBucket
+  DistributionId:
+    Description: CloudFront distribution id (used for invalidations and the CloudWatch dashboard)
+    Value: !Ref Distribution
+  DistributionDomain:
+    Description: CloudFront domain name
+    Value: !GetAtt Distribution.DomainName
+  SiteURL:
+    Description: Public HTTPS URL of the replay viewer
+    Value: !Sub "https://${Distribution.DomainName}/"
