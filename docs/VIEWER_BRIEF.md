@@ -2,7 +2,7 @@
 
 **Status (handed over 2026-10-26 20:35 UTC):**
 - **Done:** the design-and-build pass ran in the local session. It wrote new `viewer/index.html`, `app.js`, `style.css` and `fonts/`, plus `chev-*.svg`, `favicon.svg` and `PRODUCT.md`.
-- **Not done:** the local session ended before the **finish review** and **fix** stages. DESIGN.md was never written.
+- **Done (2026-10-27):** finish review and fix pass (impeccable + taste-skill-v2); DESIGN.md written. Hero camera frames re-rendered with the run's fog (β 0.05).
 - **To finish it:**
   1. Load the `impeccable` skill (installed on this box) and read `~/.agents/skills/design-taste-frontend/SKILL.md` (the team's taste-skill-v2).
   2. Run a critique / finish review of the current viewer against this brief. Take headless-Chromium screenshots at 1920×1080 and 390 px.

@@ -94,7 +94,8 @@ def _view(f, i, hid, kind, r, c, frames, bgs, beta, cell, det, looked, expected,
 
 def render_episode(path: Path, det: YoloxDetector, bgs: list) -> dict:
     ep = json.loads(path.read_text())
-    eid, frames, beta = ep["id"], ep["frames"], float(ep["config"].get("beta", 0.0) or 0.0)
+    eid, frames = ep["id"], ep["frames"]
+    beta = float(ep["config"].get("beta") or ep.get("metrics", {}).get("beta") or 0.0)   # export keeps beta in metrics
     cell = float(ep["config"].get("cell_metres", 5))
     out = path.parent / "frames" / eid
     (out / "zoom").mkdir(parents=True, exist_ok=True)

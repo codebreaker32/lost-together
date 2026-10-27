@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
 <title>Lost Together · Replay</title>
-<meta name="description" content="The same simulated forest run twice: four hikers who each see through their own camera, OpenCV 5 detections, and a shared living map. Solo against shared, side by side.">
+<meta name="description" content="Paired replay of one simulated forest episode under two cooperation conditions: per-hiker camera frames, OpenCV 5 detections and the shared living map.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/NationalPark-Bold.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="fonts/NationalPark-Regular.woff" as="font" type="font/woff" crossorigin>
@@ -15,7 +16,7 @@
 <div class="instrument" id="instrument">
   <header class="band">
     <a class="wordmark" href="./">Lost Together</a>
-    <p class="runline" id="runline">Loading the replay</p>
+    <p class="runline" id="runline">Loading replay</p>
     <div class="pickers" id="pickers">
       <label class="picker"><span class="side-key">L</span><span class="sr">Left run</span><select id="pickL"></select></label>
       <label class="picker"><span class="side-key">R</span><span class="sr">Right run</span><select id="pickR"></select></label>
@@ -31,15 +32,17 @@
         <p class="outcome" aria-live="polite"><span class="o-big"></span><span class="o-sub"></span></p>
       </header>
       <div class="run-stage">
-        <div class="map-wrap">
-          <canvas class="map" role="img" aria-label="Map of the left run"></canvas>
-          <p class="map-badges"></p>
-          <ol class="toasts" aria-hidden="true"></ol>
-        </div>
         <figure class="cam">
           <canvas class="cam-cv" role="img" aria-label="Camera frame"></canvas>
           <figcaption class="cam-cap"></figcaption>
         </figure>
+        <div class="map-wrap">
+          <canvas class="map" role="img" aria-label="Map of the left run"></canvas>
+          <div class="rail">
+            <p class="map-badges"></p>
+            <ol class="toasts" aria-hidden="true"></ol>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -50,30 +53,36 @@
         <p class="outcome" aria-live="polite"><span class="o-big"></span><span class="o-sub"></span></p>
       </header>
       <div class="run-stage">
-        <div class="map-wrap">
-          <canvas class="map" role="img" aria-label="Map of the right run"></canvas>
-          <p class="map-badges"></p>
-          <ol class="toasts" aria-hidden="true"></ol>
-        </div>
         <figure class="cam">
           <canvas class="cam-cv" role="img" aria-label="Camera frame"></canvas>
           <figcaption class="cam-cap"></figcaption>
         </figure>
+        <div class="map-wrap">
+          <canvas class="map" role="img" aria-label="Map of the right run"></canvas>
+          <div class="rail">
+            <p class="map-badges"></p>
+            <ol class="toasts" aria-hidden="true"></ol>
+          </div>
+        </div>
       </div>
     </section>
 
     <aside class="side" aria-label="Hikers and field log">
       <section class="verdict" id="verdict" aria-live="polite"></section>
       <section class="roster-wrap">
-        <h2 class="side-h">Hikers <span class="side-note">choose one to follow its camera</span></h2>
+        <h2 class="side-h">Hikers <span class="side-note">select to show camera</span></h2>
         <table class="roster" id="roster">
           <thead><tr><th scope="col">Hiker</th><th scope="col"><span class="side-key">L</span> <span id="rosterL"></span></th><th scope="col"><span class="side-key">R</span> <span id="rosterR"></span></th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
+      <section class="key-wrap" aria-labelledby="miniKeyH">
+        <h2 class="side-h" id="miniKeyH">Legend</h2>
+        <ul class="mini-key" id="miniKey"></ul>
+      </section>
       <section class="log-wrap">
         <h2 class="side-h">Field log
-          <label class="log-opt"><input type="checkbox" id="optSightLog"> every report</label>
+          <label class="log-opt"><input type="checkbox" id="optSightLog"> all reports</label>
         </h2>
         <ol class="log" id="log" aria-live="off"></ol>
       </section>
@@ -90,7 +99,7 @@
       <div class="ticks" id="ticks" aria-hidden="true"></div>
       <input type="range" id="scrub" min="0" max="1" value="0" step="1" aria-label="Time step">
     </div>
-    <p class="clock"><span id="clockM">0:00</span><span id="clockT">step 0</span></p>
+    <p class="clock"><span id="clockM">0:00</span><span id="clockT"></span></p>
     <label class="speed"><span class="sr">Playback speed</span>
       <select id="speed" aria-keyshortcuts="ArrowUp ArrowDown">
         <option value="3">3 steps/s</option>
@@ -100,7 +109,7 @@
         <option value="40">40 steps/s</option>
       </select>
     </label>
-    <button type="button" class="tog" id="optFF" aria-pressed="true" aria-keyshortcuts="F">Skip quiet <span class="ff-ind" id="ffInd" hidden>5×</span></button>
+    <button type="button" class="tog" id="optFF" aria-pressed="true" aria-keyshortcuts="F">Skip idle <span class="ff-ind" id="ffInd" hidden>5×</span></button>
     <button type="button" class="tog layers-btn" id="btnLayers" aria-expanded="false" aria-controls="layers">Layers</button>
     <div class="layers" id="layers" role="group" aria-label="Map layers">
       <button type="button" class="tog" id="optMap" aria-pressed="true" aria-keyshortcuts="M">Living map</button>
@@ -114,11 +123,9 @@
 
 <div class="below">
   <section class="sec findings" id="findings" hidden aria-labelledby="findingsH">
-    <h2 id="findingsH">What the experiment found</h2>
-    <div class="findings-body">
-      <dl class="headline" id="headline"></dl>
-      <figure class="findings-fig" id="findingsFig" hidden><img id="findingsImg" alt=""><figcaption id="findingsCap"></figcaption></figure>
-    </div>
+    <h2 id="findingsH">Results</h2>
+    <dl class="headline" id="headline"></dl>
+    <figure class="findings-fig" id="findingsFig" hidden><figcaption id="findingsCap"></figcaption></figure>
   </section>
 
   <section class="sec agent" id="agent" aria-labelledby="agentH">
@@ -127,25 +134,25 @@
   </section>
 
   <section class="sec how" aria-labelledby="howH">
-    <h2 id="howH">How the hikers see and decide</h2>
+    <h2 id="howH">Pipeline</h2>
     <ol class="pipeline">
-      <li><h3>Each hiker has a camera</h3><p>Every hiker sees the forest through its own 640 × 640 frame: TartanGround forest imagery with the predator or a natural decoy composited at its true distance, and fog added with the scattering model.</p></li>
-      <li><h3>OpenCV 5 finds the predator</h3><p>YOLOX-s runs on the new <code>cv2.dnn</code> engine (ENGINE_NEW). On a full frame it finds the predator out to about 15 m.</p></li>
-      <li><h3>Look closer</h3><p>When a report is uncertain, the hiker re-runs the detector on a 3× zoom tile around it. That confirms or dismisses it out to about 20 to 30 m.</p></li>
-      <li><h3>One living map</h3><p>Hikers who share put every sighting on one map, and old evidence fades. A teammate's report makes a hiker scan with zoom.</p></li>
-      <li><h3>Decide, with a person in the loop</h3><p>A rule-based planner and an LLM agent (qwen3-vl on an AWS GPU, calling OpenCV 5 tools through an MCP server) decide when to escape. An escape order is an evacuation broadcast, so a ranger approves or overrides it.</p></li>
+      <li><h3>Per-hiker camera</h3><p>640 × 640 TartanGround forest frames; the predator or a natural decoy is composited at its true distance, and fog is added with the scattering model.</p></li>
+      <li><h3>OpenCV 5 detection</h3><p>YOLOX-s on the new <code>cv2.dnn</code> engine (ENGINE_NEW). Full-frame detection range: about 15&nbsp;m.</p></li>
+      <li><h3>Look closer</h3><p>Uncertain reports are re-checked on a 3× zoom tile, which confirms or dismisses them out to about 20–30&nbsp;m.</p></li>
+      <li><h3>Shared living map</h3><p>In sharing conditions, all sightings go to one map and evidence decays over time. A teammate's report triggers a zoom scan.</p></li>
+      <li><h3>Decision and human approval</h3><p>A rule-based planner and an LLM agent (qwen3-vl on an AWS GPU, calling OpenCV 5 tools through an MCP server) decide when to escape. Escape orders are evacuation broadcasts; a ranger approves or overrides each one.</p></li>
     </ol>
   </section>
 
   <section class="sec legend-sec" aria-labelledby="legendH">
-    <h2 id="legendH">Reading the replay</h2>
+    <h2 id="legendH">Legend</h2>
     <div class="legend-cols">
       <div>
-        <h3>On the map</h3>
+        <h3>Map</h3>
         <ul class="legend" id="legend"></ul>
       </div>
       <div>
-        <h3>On the camera</h3>
+        <h3>Camera</h3>
         <ul class="legend" id="legendCam"></ul>
       </div>
       <div>
@@ -156,15 +163,15 @@
   </section>
 
   <footer class="colophon">
-    <p>Everything on this page is a simulation. Only the evaluator view shows ground truth; the hikers and the agent never see it.</p>
-    <p>Forest frames: TartanGround (CC BY 4.0). Animal cut-outs: public domain, CC0 and CC BY 2.0, listed in the project README. Typeface: National Park (SIL Open Font License, <a href="fonts/OFL.txt">licence</a>).</p>
+    <p>All content is simulated. Ground truth appears only in the evaluator view; hikers and the agent never receive it.</p>
+    <p>Forest frames: TartanGround (CC BY 4.0). Animal cut-outs: public domain, CC0 and CC BY 2.0 (credited in the project README). Typeface: National Park (SIL Open Font License, <a href="fonts/OFL.txt">licence</a>).</p>
   </footer>
 </div>
 
 <dialog class="help" id="help" aria-labelledby="helpH">
   <h2 id="helpH">Keyboard</h2>
   <dl class="keys" id="keysDialog"></dl>
-  <p class="help-url">URL options: <code>?left=ID&amp;right=ID&amp;t=0&amp;speed=10&amp;play=1&amp;eval=1&amp;risk=1&amp;reveal=end&amp;ff=0&amp;capture=1&amp;hiker=4</code></p>
+  <p class="help-url">URL parameters: <code>?left=ID&amp;right=ID&amp;t=0&amp;speed=10&amp;play=1&amp;eval=1&amp;risk=1&amp;reveal=end&amp;ff=0&amp;capture=1&amp;hiker=4</code></p>
   <form method="dialog"><button class="tbtn wide" type="submit">Close</button></form>
 </dialog>
 <div class="fatal" id="fatal" hidden></div>

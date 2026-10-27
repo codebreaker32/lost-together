@@ -1,0 +1,182 @@
+[
+ {
+  "i": 1,
+  "start": 0.2,
+  "end": 2.4,
+  "text": "Four hikers are lost in a forest."
+ },
+ {
+  "i": 2,
+  "start": 2.4,
+  "end": 5.066666666666666,
+  "text": "A predator is nearby. Each hiker has one camera."
+ },
+ {
+  "i": 3,
+  "start": 5.2,
+  "end": 8.266666666666667,
+  "text": "At 10 metres, the detector finds the bear. In thick fog, it reports an elephant."
+ },
+ {
+  "i": 4,
+  "start": 8.266666666666667,
+  "end": 11.0,
+  "text": "At 30 metres, it finds nothing."
+ },
+ {
+  "i": 5,
+  "start": 11.2,
+  "end": 15.866666666666667,
+  "text": "Calibrated detection range: about 15 metres."
+ },
+ {
+  "i": 6,
+  "start": 16.2,
+  "end": 19.066666666666666,
+  "text": "Does sharing what each hiker sees help them get out?"
+ },
+ {
+  "i": 7,
+  "start": 19.066666666666666,
+  "end": 22.6,
+  "text": "Each camera view feeds one shared, living map. Old sightings fade."
+ },
+ {
+  "i": 8,
+  "start": 22.733333333333334,
+  "end": 26.0,
+  "text": "A teammate's report tells a hiker where to look closer, with a 3\u00d7 zoom."
+ },
+ {
+  "i": 9,
+  "start": 26.0,
+  "end": 28.933333333333334,
+  "text": "Clear air: bear found at 20 metres. Light fog: missed."
+ },
+ {
+  "i": 10,
+  "start": 29.133333333333333,
+  "end": 31.8,
+  "text": "Same forest, same predator, same random seed. Run twice."
+ },
+ {
+  "i": 11,
+  "start": 32.0,
+  "end": 37.333333333333336,
+  "text": "Left: each hiker keeps a private map. Right: one shared map."
+ },
+ {
+  "i": 12,
+  "start": 37.333333333333336,
+  "end": 43.0,
+  "text": "Sightings, exits and explored ground reach every hiker. Old evidence fades."
+ },
+ {
+  "i": 13,
+  "start": 43.0,
+  "end": 49.333333333333336,
+  "text": "Only a separate evaluator holds ground truth. The hikers never see it."
+ },
+ {
+  "i": 14,
+  "start": 49.666666666666664,
+  "end": 53.93333333333333,
+  "text": "Solo: 2 of 4 got out. Shared map: 4 of 4. A selected example, not the average."
+ },
+ {
+  "i": 15,
+  "start": 54.2,
+  "end": 58.666666666666664,
+  "text": "Every pixel step runs on OpenCV 5. YOLOX-s runs on the new DNN engine."
+ },
+ {
+  "i": 16,
+  "start": 58.666666666666664,
+  "end": 63.4,
+  "text": "Look-closer defogs and zooms. StereoSGBM computes depth from the stereo pair."
+ },
+ {
+  "i": 17,
+  "start": 63.4,
+  "end": 67.93333333333334,
+  "text": "Dense odometry failed on foliage. ORB features and solvePnPRansac track each hiker."
+ },
+ {
+  "i": 18,
+  "start": 68.2,
+  "end": 73.66666666666667,
+  "text": "Predictions were committed first. Then 159,800 calibrated episodes ran on AWS Graviton."
+ },
+ {
+  "i": 19,
+  "start": 73.86666666666666,
+  "end": 78.0,
+  "text": "In clear air, sharing raised the escape rate from 27% to 42%."
+ },
+ {
+  "i": 20,
+  "start": 78.0,
+  "end": 82.0,
+  "text": "Sharing beat solo in all 56 settings, at every fog level tested."
+ },
+ {
+  "i": 21,
+  "start": 82.2,
+  "end": 87.93333333333334,
+  "text": "One prediction was partly wrong: shared sightings kept helping against a predator that senses the whole forest."
+ },
+ {
+  "i": 22,
+  "start": 88.13333333333334,
+  "end": 91.66666666666667,
+  "text": "On uncertain sightings, an LLM agent calls OpenCV tools."
+ },
+ {
+  "i": 23,
+  "start": 91.66666666666667,
+  "end": 95.73333333333333,
+  "text": "It queries the map, checks for motion, and looks closer: bear 0.16 becomes bear 0.58."
+ },
+ {
+  "i": 24,
+  "start": 95.73333333333333,
+  "end": 99.0,
+  "text": "It orders an escape. The evaluator confirms a real bear."
+ },
+ {
+  "i": 25,
+  "start": 99.13333333333334,
+  "end": 103.2,
+  "text": "A human ranger approves every escape order. If the model fails, the rule decides."
+ },
+ {
+  "i": 26,
+  "start": 103.33333333333333,
+  "end": 108.93333333333334,
+  "text": "The agent is not more accurate than the rule: fewer false alarms, more missed bears in thick fog."
+ },
+ {
+  "i": 27,
+  "start": 109.13333333333334,
+  "end": 114.0,
+  "text": "AWS: Graviton for sweeps, an L40S GPU for the agent, Lambda for the viewer."
+ },
+ {
+  "i": 28,
+  "start": 114.0,
+  "end": 118.93333333333334,
+  "text": "GPU spend is capped at $10; about $2.60 used. GPU instances stop themselves."
+ },
+ {
+  "i": 29,
+  "start": 119.2,
+  "end": 124.33333333333333,
+  "text": "Solo: 27% got out. Shared map: 42%."
+ },
+ {
+  "i": 30,
+  "start": 124.66666666666667,
+  "end": 129.93333333333334,
+  "text": "Lost Together. All simulated. Every prediction reported."
+ }
+]

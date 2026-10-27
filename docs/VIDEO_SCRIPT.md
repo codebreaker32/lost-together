@@ -33,7 +33,7 @@ uv run python -m lost_together.vision.demo          # refreshes data/demo/*.png
 | 0:40–0:52 | Let the episode run to the end (`reveal=end` hides the outcome until then). The left shows 2 of 4 out and 2 intercepted. The right shows 4 of 4 out. | "In this forest, alone, two hikers reach an exit and two are intercepted. Sharing, all four get out. This is a clear example, not the average." |
 | 0:52–1:00 | Press `E` (evaluator view): real sightings in vermilion, false ones in grey. Caption: "Only the evaluator knows which sightings were real." | "Only a separate evaluator knows which sightings were real. The hikers and the agent never see the ground truth." |
 
-{{TBD: camera tiles inside the viewer. The viewer reads `viewer/data/frames/<episode_id>/<t>_<hiker>.jpg`, which is not exported yet. Until it is, keep the camera shots in the 0:00–0:20 section.}}
+Camera views are exported for the hero pair (`viewer/data/frames/`): the viewer shows the followed hiker's full frame and the 3× look-closer tile above each map, with the real YOLOX boxes.
 
 ## 1:00–1:30 · The agent looks again, and a person decides
 

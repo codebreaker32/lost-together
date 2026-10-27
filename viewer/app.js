@@ -10,18 +10,20 @@
   // ---------- constants ----------
   const HIKER = ['#0072B2', '#CC79A7', '#009E73', '#56B4E9', '#E69F00', '#F0E442', '#000000', '#999999'];
   const C = {
-    ink: '#131a16', ink2: '#414c45', ink3: '#5c6861', paper: '#fbfcf9', rule: '#c3cac0',
+    ink: '#131a16', ink2: '#414c45', ink3: '#5c6861', paper: '#fbfcf9', ground: '#f1f3ef', rule: '#c3cac0',
     predator: '#D55E00', report: '#E69F00', reportDark: '#9a6700', fake: '#6f7a73', truth: '#F0E442', well: '#0d120f',
+    title: 'rgba(13,18,15,0.82)', casing: 'rgba(8,11,9,0.5)',
   };
   // terrain RGB per state: [not yet seen, explored, just explored, living map off]
   const TERRAIN = {
     ground: [[214, 219, 211], [251, 252, 249], [255, 241, 168], [246, 247, 243]],
     trees: [[184, 194, 180], [163, 204, 152], [196, 226, 140], [181, 210, 171]],
   };
+  const CAP_H = 66;                // camera caption: up to three lines (detections, evaluator, honest note)
   const FRESH_STEPS = 10;
   const TOAST_STEPS = 28;
   const DET_MIN = 0.25;            // camera_tiles.py runs YoloxDetector(conf=0.25)
-  const MODE_LABEL = { enjoy: 'Enjoying', escape: 'Escaping', home: 'Heading home', escaped: 'Got out', caught: 'Intercepted', lost: 'Still lost' };
+  const MODE_LABEL = { enjoy: 'Walking', escape: 'Escaping', home: 'Heading home', escaped: 'Exited', caught: 'Intercepted', lost: 'Still lost' };
   const PRED_LABEL = { patrol: 'patrolling', pursue: 'pursuing', handling: 'paused' };
   const INF = 0x7fffffff;
   const FONT = '"National Park", ui-sans-serif, system-ui, sans-serif';
@@ -163,10 +165,10 @@
     return c;
   }
   function howShared(cfg) {
-    if (cfg.private_map && cfg.private_sightings) return 'Each hiker keeps a private map';
+    if (cfg.private_map && cfg.private_sightings) return 'Private maps';
     if (cfg.private_map) return 'Private terrain maps, shared sightings';
     if (cfg.private_sightings) return 'Shared terrain map, private sightings';
-    return 'One map shared by all hikers';
+    return 'One shared map';
   }
   const fogVis = beta => (beta > 0 ? Math.round(3.912 / beta) : null);   // Koschmieder: visibility = 3.912 / beta
 
@@ -226,7 +228,7 @@
       fatal(`<strong>No replay data found</strong>Run <code>uv run python -m lost_together.export</code>, then serve this folder with <code>python -m http.server -d viewer 8000</code>.<br>(${esc(err.message)})`);
       return;
     }
-    if (!index.episodes || index.episodes.length === 0) { fatal('<strong>index.json lists no episodes</strong>'); return; }
+    if (!index.episodes || index.episodes.length === 0) { fatal('<strong>No episodes in index.json</strong>'); return; }
     state.index = index;
     for (const sel of [$('#pickL'), $('#pickR')]) {
       sel.innerHTML = index.episodes.map(e => {
@@ -264,7 +266,7 @@
       const [L, R] = await Promise.all([loadEpisode($('#pickL').value), loadEpisode($('#pickR').value)]);
       state.L = L; state.R = R;
     } catch (err) {
-      fatal(`<strong>Could not load an episode</strong>${esc(err.message)}`);
+      fatal(`<strong>Episode failed to load</strong>${esc(err.message)}`);
       return;
     }
     state.T = Math.max(state.L.tEnd, state.R.tEnd);
@@ -294,11 +296,10 @@
       '<b>Simulation</b>',
       same ? `seed ${esc(L.raw.seed)}` : `seeds ${esc(L.raw.seed)} and ${esc(R.raw.seed)}`,
       `${esc(c.perception)} perception`,
-      vis ? `fog β ${L.beta}, visibility about ${vis} m` : 'clear air',
-      `${c.n_hikers} hikers in a ${L.n * m} m forest`,
-      `predator as fast as a hiker${c.speed_ratio === 1 ? '' : ` × ${c.speed_ratio}`}, senses ${c.sense_radius * m} m`,
+      vis ? `fog β ${L.beta} (visibility ≈${vis} m)` : 'clear air',
+      `${c.n_hikers} hikers`, `${L.n * m} m forest`,
+      `predator speed ${c.speed_ratio}× hiker`, `sensing radius ${c.sense_radius * m} m`,
     ];
-    if (c.speed_ratio !== 1) parts[5] = `predator ${c.speed_ratio}× a hiker's speed, senses ${c.sense_radius * m} m`;
     $('#runline').innerHTML = parts.join(' · ');
   }
 
@@ -309,28 +310,48 @@
     const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     const gap = parseFloat(cs.columnGap) || 24;
     const inner = board.clientWidth - padX;
-    let S;
-    if (W >= 1100) {
+    // S: run column width; the camera strip (frame + 3x tile) spans it at S/2 high and comes first.
+    // M: map side. On a wide screen the map takes the height that is left, and the room beside it
+    // becomes a rail for the run's latest events instead of covering the map.
+    let S, M;
+    // Lock the board to one viewport only when it is tall enough to film (1080p); shorter laptop
+    // screens scroll a little instead of shrinking the camera frames to thumbnails.
+    const fit = W >= 1100 && window.innerHeight >= 900;
+    document.body.classList.toggle('fit', fit);
+    if (fit) {
       const boardH = board.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       const head = Math.max(panes[0].head.offsetHeight, panes[1].head.offsetHeight);
-      const capH = 64, stageGap = 10;
-      S = Math.min((boardH - head - capH - stageGap) / 1.5, (inner - 2 * gap - 340) / 2);
+      const capH = CAP_H, stageGaps = 2 * 10;
+      const side = clamp(inner * 0.24, 380, 460);
+      S = (inner - 2 * gap - side) / 2;
+      const avail = boardH - head - capH - stageGaps;
+      if (avail - S / 2 < 0.62 * S) S = avail / 1.12;     // keep the map at least ~0.6 of the strip
+      M = Math.min(S, avail - S / 2);
+    } else if (W >= 1100) {
+      S = (inner - 2 * gap - clamp(inner * 0.27, 360, 460)) / 2; M = S;
     } else if (W > 720) {
-      S = (inner - gap) / 2;
+      S = (inner - gap) / 2; M = S;
     } else {
-      S = inner;
+      S = inner; M = S;
     }
     S = Math.max(240, Math.floor(S / 2) * 2);
+    M = Math.max(220, Math.floor(Math.min(M, S)));
     const dpr = window.devicePixelRatio || 1;
-    if (!force && S === state.S && panes.every(p => p.dpr === dpr)) return;
-    state.S = S;
+    if (!force && S === state.S && M === state.M && panes.every(p => p.dpr === dpr)) return;
+    state.S = S; state.M = M;
     document.documentElement.style.setProperty('--S', `${S}px`);
+    document.documentElement.style.setProperty('--M', `${M}px`);
+    document.body.classList.toggle('railed', S - M >= 190);
+    // The map plate is exactly M x M and lines up with the camera strip's left edge; the canvas adds a
+    // transparent margin (pad) on every side that overhangs into the gutter for exit marks and labels.
+    const pad = Math.round(clamp(M * 0.028, 10, 18));
+    document.documentElement.style.setProperty('--pad', `${pad}px`);
     for (const p of panes) {
-      p.canvas.width = p.canvas.height = Math.round(S * dpr);
+      p.canvas.width = p.canvas.height = Math.round((M + 2 * pad) * dpr);
       p.cam.width = Math.round(S * dpr); p.cam.height = Math.round((S / 2) * dpr);
-      p.px = S; p.dpr = dpr;
-      p.pad = Math.round(clamp(S * 0.028, 10, 18));
-      p.map = S - 2 * p.pad;
+      p.px = M + 2 * pad; p.cw = S; p.dpr = dpr;
+      p.pad = pad;
+      p.map = M;
       p.cell = p.map / (p.ep ? p.ep.n : 80);
       p.camKey = '';
     }
@@ -342,7 +363,9 @@
     layoutQueued = true;
     requestAnimationFrame(() => { layoutQueued = false; layout(false); });
   };
-  new ResizeObserver(queueLayout).observe($('#board'));
+  const ro = new ResizeObserver(queueLayout);
+  ro.observe($('#board'));
+  for (const p of panes) ro.observe(p.head);       // the outcome text arrives after the first layout
   window.addEventListener('resize', queueLayout);
 
   // ---------- rendering: map ----------
@@ -407,8 +430,7 @@
     const ctx = p.ctx, cs = p.cell, t = Math.floor(pt), a = pt - t, tt = Math.min(t, ep.tEnd);
     const ae = t >= ep.tEnd ? 0 : a;
     ctx.setTransform(p.dpr, 0, 0, p.dpr, 0, 0);
-    ctx.fillStyle = C.paper;
-    ctx.fillRect(0, 0, p.px, p.px);
+    ctx.clearRect(0, 0, p.px, p.px);    // the margin stays transparent; the neatline frames the plate
     ctx.translate(p.pad, p.pad);
     renderBase(p, ep, tt);
     ctx.imageSmoothingEnabled = false;
@@ -430,16 +452,25 @@
     }
 
     if (state.opts.trail) {
+      // Routes: others as fine lines, the followed hiker last, on a paper casing so it reads over any terrain.
       const k = frameIdx(ep, tt);
-      ctx.lineWidth = Math.max(1.6, cs * 0.26); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      for (let i = 0; i < ep.nh; i++) {
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      const route = i => {
         const P = ep.path[i];
-        ctx.strokeStyle = HIKER[i % HIKER.length];
-        ctx.globalAlpha = i === state.sel ? 0.9 : 0.4;
         ctx.beginPath();
         ctx.moveTo(X(P[1]), Y(P[0]));
         for (let j = 1; j <= k; j++) ctx.lineTo(X(P[2 * j + 1]), Y(P[2 * j]));
-        ctx.stroke();
+      };
+      const wSel = Math.max(2, cs * 0.34), wOther = Math.max(1.25, cs * 0.2);
+      for (let i = 0; i < ep.nh; i++) {
+        if (i === state.sel) continue;
+        route(i);
+        ctx.strokeStyle = HIKER[i % HIKER.length]; ctx.globalAlpha = 0.6; ctx.lineWidth = wOther; ctx.stroke();
+      }
+      if (state.sel < ep.nh) {
+        route(state.sel);
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = C.paper; ctx.lineWidth = wSel + 2.5; ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = HIKER[state.sel % HIKER.length]; ctx.lineWidth = wSel; ctx.stroke();
       }
       ctx.globalAlpha = 1;
     }
@@ -501,21 +532,24 @@
       ctx.fillStyle = C.paper;
       ctx.fillRect(x - s * 0.35, y - s * 0.5, s * 0.7, s);
     }
-    ctx.font = `700 ${Math.max(11, Math.round(cs * 1.3))}px ${FONT}`;
+    const fs = Math.max(11, Math.round(cs * 1.3)), lh = fs + 6;
+    ctx.font = `700 ${fs}px ${FONT}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.04em';
     ctx.textBaseline = 'middle';
     let tx = x, ty = y, align = 'center';
-    if (r <= 1) ty = y + s + 10; else if (r >= n - 2) ty = y - s - 10;
-    else if (c <= 1) { tx = x + s + 5; align = 'left'; } else { tx = x - s - 5; align = 'right'; }
-    ctx.textAlign = align;
-    const text = known ? 'EXIT' : 'EXIT, not yet seen';
+    if (r <= 1) ty = y + s + 4 + lh / 2; else if (r >= n - 2) ty = y - s - 4 - lh / 2;
+    else if (c <= 1) { tx = x + s + 6; align = 'left'; } else { tx = x - s - 6; align = 'right'; }
+    const text = known ? 'EXIT' : 'EXIT (unseen)';
     const w = ctx.measureText(text).width;
     let bx = align === 'center' ? tx - w / 2 : align === 'left' ? tx : tx - w;
-    bx = clamp(bx, 2, mapW - w - 2);
+    bx = Math.round(clamp(bx, 4, mapW - w - 4));
+    const by = Math.round(ty - lh / 2);
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(251,252,249,0.9)';
-    ctx.fillRect(bx - 3, ty - 9, w + 6, 18);
-    ctx.fillStyle = known ? C.ink : C.ink3;
-    ctx.fillText(text, bx, ty + 0.5);
+    ctx.fillStyle = known ? C.ink : 'rgba(251,252,249,0.94)';
+    ctx.fillRect(bx - 4, by, w + 8, lh);
+    if (!known) { ctx.lineWidth = 1; ctx.strokeStyle = C.rule; ctx.strokeRect(bx - 3.5, by + 0.5, w + 7, lh - 1); }
+    ctx.fillStyle = known ? C.paper : C.ink2;
+    ctx.fillText(text, bx, by + lh / 2 + 0.5);
     ctx.restore();
   }
   function roundRect(ctx, x, y, w, h, r) {
@@ -577,13 +611,14 @@
   function tag(ctx, text, x, y, bg, fg, cs, mapW) {
     const fs = Math.max(11, Math.round(cs * 1.25));
     ctx.font = `700 ${fs}px ${FONT}`;
-    const w = ctx.measureText(text).width + 12, h = fs + 7;
+    const w = Math.ceil(ctx.measureText(text).width) + 12, h = fs + 8;
     x = clamp(x, w / 2 + 2, Math.max(w / 2 + 2, mapW - w / 2 - 2));
     y = Math.max(y, h / 2 + 2);
+    const bx = Math.round(x - w / 2), by = Math.round(y - h / 2);
     ctx.fillStyle = bg;
-    ctx.fillRect(x - w / 2, y - h / 2, w, h);
-    ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y + 0.5);
+    ctx.fillRect(bx, by, w, h);
+    ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, bx + 6, by + h / 2 + 0.5);
   }
   function drawHiker(ctx, x, y, cs, i, st, selected, pt) {
     const R = Math.max(7, cs * 1.05), col = HIKER[i % HIKER.length];
@@ -640,20 +675,41 @@
 
   // ---------- rendering: camera strip (full frame + 3x look-closer tile) ----------
   function detStyle(d, view) {
-    const lab = `${d.cls} ${f2(d.score)}`;
+    const lab = [[String(d.cls), 700], [` ${f2(d.score)}`, 400]];
     if (!state.opts.eval) return { col: C.report, fg: C.ink, dash: null, label: lab };
-    if (d.matches_truth && view.kind === 'real') return { col: C.predator, fg: '#ffffff', dash: null, label: `${lab} · predator` };
-    if (d.matches_truth && view.kind === 'decoy') return { col: '#ffffff', fg: C.ink, dash: [6, 4], label: `${lab} · decoy, not the predator` };
-    return { col: '#ffffff', fg: C.ink, dash: [6, 4], label: `${lab} · false positive` };
+    if (d.matches_truth && view.kind === 'real') return { col: C.predator, fg: '#ffffff', dash: null, label: [...lab, [' · predator', 700]] };
+    if (d.matches_truth && view.kind === 'decoy') return { col: '#ffffff', fg: C.ink, dash: [5, 4], label: [...lab, [' · decoy', 700]] };
+    return { col: '#ffffff', fg: C.ink, dash: [5, 4], label: [...lab, [' · false positive', 700]] };
   }
+  // A label on a camera tile. bounds.placed collects earlier labels so new ones never cover them:
+  // a colliding label steps down (then up) until it is clear.
+  // text is a string (bold) or a list of [segment, weight] pairs, e.g. a class name in bold and its score
+  // in regular weight. Every edge lands on a whole pixel so labels stay crisp.
   function chip(ctx, text, x, y, bg, fg, bounds, fs) {
-    ctx.font = `700 ${fs}px ${FONT}`;
-    const w = ctx.measureText(text).width + 10, h = fs + 7;
-    x = clamp(x, bounds.x, bounds.x + bounds.w - w);
-    y = clamp(y, bounds.y, bounds.y + bounds.h - h);
+    const segs = Array.isArray(text) ? text : [[text, 700]];
+    const padX = 6;
+    let tw = 0;
+    for (const [s, wt] of segs) { ctx.font = `${wt} ${fs}px ${FONT}`; tw += ctx.measureText(s).width; }
+    const w = Math.ceil(tw) + 2 * padX, h = fs + 8;
+    x = Math.round(clamp(x, bounds.x, bounds.x + bounds.w - w));
+    y = Math.round(clamp(y, bounds.y, bounds.y + bounds.h - h));
+    const placed = bounds.placed || (bounds.placed = []);
+    const hits = yy => placed.find(r => x < r.x + r.w && x + w > r.x && yy < r.y + r.h && yy + h > r.y);
+    let tries = 0, dir = 1, y0 = y;
+    for (let r = hits(y); r && tries < 12; r = hits(y), tries++) {
+      y = dir > 0 ? r.y + r.h + 2 : r.y - h - 2;
+      if (y + h > bounds.y + bounds.h || y < bounds.y) { if (dir < 0) break; dir = -1; y = y0; }
+    }
+    y = Math.round(clamp(y, bounds.y, bounds.y + bounds.h - h));
+    placed.push({ x, y, w, h });
     ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + 5, y + h / 2 + 0.5);
+    let cx = x + padX;
+    for (const [s, wt] of segs) {
+      ctx.font = `${wt} ${fs}px ${FONT}`;
+      ctx.fillText(s, cx, y + h / 2 + 0.5);
+      cx += ctx.measureText(s).width;
+    }
     return { x, y, w, h };
   }
   function drawBoxes(ctx, dets, view, ox, oy, sc, bounds, fs) {
@@ -661,18 +717,21 @@
     for (const d of sorted) {
       const st = detStyle(d, view);
       const [bx, by, bw, bh] = d.box;
-      const x = ox + bx * sc, y = oy + by * sc, w = Math.max(3, bw * sc), h = Math.max(3, bh * sc);
+      // whole-pixel box with a 2px stroke on a dark casing, so the edge is crisp on bright foliage and sky
+      const x = Math.round(ox + bx * sc), y = Math.round(oy + by * sc);
+      const w = Math.max(4, Math.round(bw * sc)), h = Math.max(4, Math.round(bh * sc));
       ctx.save();
       ctx.beginPath(); ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h); ctx.clip();
-      ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(13,18,15,0.55)';
-      ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+      ctx.lineWidth = 4; ctx.strokeStyle = C.casing;
+      ctx.strokeRect(x, y, w, h);
       ctx.lineWidth = 2; ctx.strokeStyle = st.col;
       if (st.dash) ctx.setLineDash(st.dash);
       ctx.strokeRect(x, y, w, h);
       ctx.setLineDash([]);
       ctx.restore();
-      const above = y - fs - 9 >= bounds.y;
-      chip(ctx, st.label, x, above ? y - fs - 9 : y + h + 2, st.col, st.fg, bounds, fs);
+      // the label tab sits flush on the box's top edge, aligned to its outer left edge (below it when there is no room)
+      const lh = fs + 8, above = y - 1 - lh >= bounds.y;
+      chip(ctx, st.label, x - 1, above ? y - 1 - lh : y + h + 1, st.col, st.fg, bounds, fs);
     }
   }
   function drawTruth(ctx, box, view, ox, oy, sc, bounds, fs) {
@@ -682,26 +741,30 @@
     const minS = 14;
     if (w < minS) { x -= (minS - w) / 2; w = minS; }
     if (h < minS) { y -= (minS - h) / 2; h = minS; }
-    const k = Math.max(4, Math.min(w, h) * 0.3);
+    x = Math.round(x) - 3; y = Math.round(y) - 3; w = Math.round(w) + 6; h = Math.round(h) + 6;   // outside any detection box
+    const k = Math.round(Math.max(5, Math.min(w, h) * 0.3));
     ctx.save();
-    ctx.lineWidth = 2; ctx.strokeStyle = C.truth;
-    ctx.beginPath();
-    for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
-      ctx.moveTo(cx + dx * k, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * k);
-    }
-    ctx.stroke();
+    ctx.lineCap = 'square';
+    const corners = () => {
+      ctx.beginPath();
+      for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
+        ctx.moveTo(cx + dx * k, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * k);
+      }
+    };
+    corners(); ctx.lineWidth = 4; ctx.strokeStyle = C.casing; ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = C.truth; ctx.stroke();
     ctx.restore();
     const what = view.kind === 'real' ? 'predator' : 'decoy';
     const dist = view.distance_m != null ? `, ${Math.round(view.distance_m)} m` : '';
-    chip(ctx, `truth: ${what}${dist}`, x, y + h + 3, C.truth, C.ink, bounds, fs);
+    chip(ctx, `Truth: ${what}${dist}`, x, y + h + 3, C.truth, C.ink, bounds, fs);
   }
   function drawCamera(p, ep, t) {
-    const ctx = p.camCtx, S = p.px;
+    const ctx = p.camCtx, S = p.cw;
     if (!S) return;
     const sel = clamp(state.sel, 0, ep.nh - 1);
     const view = viewAt(ep, sel, t);
-    const gap = 6, half = (S - gap) / 2, H = S / 2, oy = (H - half) / 2;
-    const fs = S >= 500 ? 13 : 11;
+    const gap = 8, half = Math.floor((S - gap) / 2), H = S / 2, oy = Math.floor((H - half) / 2);
+    const fs = S >= 560 ? 13 : 12;
     const L = { x: 0, y: oy, w: half, h: half }, R = { x: half + gap, y: oy, w: half, h: half };
     const fr = view && !view.bare ? getImg(frameUrl(ep, view)) : view ? getImg(frameUrl(ep, view)) : null;
     const zm = view && view.zoom ? getImg(zoomUrl(ep, view)) : null;
@@ -709,39 +772,59 @@
     if (key !== p.camKey) {
       p.camKey = key;
       ctx.setTransform(p.dpr, 0, 0, p.dpr, 0, 0);
-      ctx.fillStyle = C.paper; ctx.fillRect(0, 0, S, H);
+      ctx.fillStyle = C.ground; ctx.fillRect(0, 0, S, H);
       ctx.fillStyle = C.well; ctx.fillRect(L.x, L.y, L.w, L.h); ctx.fillRect(R.x, R.y, R.w, R.h);
+      // empty-state text, word-wrapped to the tile: a bold first line, quieter lines after it
       const say = (b, lines) => {
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const out = [];
         lines.forEach((ln, i) => {
           ctx.font = `${i === 0 ? 700 : 400} ${i === 0 ? fs + 2 : fs}px ${FONT}`;
+          let cur = '';
+          for (const w of ln.split(' ')) {
+            const next = cur ? `${cur} ${w}` : w;
+            if (cur && ctx.measureText(next).width > b.w - 28) { out.push([cur, i]); cur = w; } else cur = next;
+          }
+          out.push([cur, i]);
+        });
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        out.forEach(([ln, i], k) => {
+          ctx.font = `${i === 0 ? 700 : 400} ${i === 0 ? fs + 2 : fs}px ${FONT}`;
           ctx.fillStyle = i === 0 ? '#e7ebe5' : '#a9b3ac';
-          ctx.fillText(ln, b.x + b.w / 2, b.y + b.h / 2 + (i - (lines.length - 1) / 2) * (fs + 8));
+          ctx.fillText(ln, b.x + b.w / 2, b.y + b.h / 2 + (k - (out.length - 1) / 2) * (fs + 8));
         });
       };
       if (!view) {
-        say(L, ['No camera frame yet', `${hName(sel)} has not looked at anything worth keeping`]);
+        say(L, ['No frame yet', `No frame recorded for ${hName(sel)} at this step`]);
       } else if (fr.err) {
         say(L, ['Frame not exported', `step ${view.t}`]);
       } else if (fr.ok) {
         const sc = half / 640;
         ctx.drawImage(fr.img, L.x, L.y, half, half);
+        // tile titles first, so detection and truth labels are placed around them
+        const small = half < 300;
+        chip(ctx, small ? `${hName(sel)} · full frame` : [[`${hName(sel)} · full frame`, 700], [' · YOLOX-s', 400]], L.x + 8, L.y + 8, C.title, '#ffffff', L, fs);
+        const mb = ep.manifest && ep.manifest.beta, eb = ep.beta;
+        if (mb != null && Math.abs(Number(mb) - eb) > 1e-6) {
+          chip(ctx, small ? `Render β ${Number(mb)} · run β ${eb}` : Number(mb) === 0 ? `Rendered without fog · run β ${eb}` : `Rendered at β ${mb} · run β ${eb}`,
+            L.x + 8, L.y + L.h - fs - 16, '#ffffff', C.ink, L, fs - 1);
+        }
         if (state.opts.eval && view.truth_box) drawTruth(ctx, view.truth_box, view, L.x, L.y, sc, L, fs);
         if (view.zoom) {         // the loupe: region the detector re-ran on, leaders to the 3x tile
           const zs = 640 / (view.zoom.factor || 3);
-          const zx = L.x + view.zoom.origin[0] * sc, zy = L.y + view.zoom.origin[1] * sc, zw = zs * sc;
+          const zx = Math.round(L.x + view.zoom.origin[0] * sc), zy = Math.round(L.y + view.zoom.origin[1] * sc), zw = Math.round(zs * sc);
           ctx.save();
-          ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(zx + zw, zy); ctx.lineTo(R.x, R.y);
-          ctx.moveTo(zx + zw, zy + zw); ctx.lineTo(R.x, R.y + R.h);
+          ctx.moveTo(zx + zw + 0.5, zy + 0.5); ctx.lineTo(R.x, R.y + 0.5);
+          ctx.moveTo(zx + zw + 0.5, zy + zw - 0.5); ctx.lineTo(R.x, R.y + R.h - 0.5);
           ctx.stroke();
-          ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
-          ctx.strokeRect(zx, zy, zw, zw);
+          ctx.lineWidth = 3; ctx.strokeStyle = C.casing;
+          ctx.strokeRect(zx + 0.5, zy + 0.5, zw - 1, zw - 1);
+          ctx.lineWidth = 1; ctx.strokeStyle = '#ffffff';
+          ctx.strokeRect(zx + 0.5, zy + 0.5, zw - 1, zw - 1);
           ctx.restore();
         }
         if (view.detections) drawBoxes(ctx, view.detections, view, L.x, L.y, sc, L, fs);
-        chip(ctx, `${hName(sel)} · full frame`, L.x + 6, L.y + 6, 'rgba(13,18,15,0.82)', '#ffffff', L, fs);
       } else {
         say(L, ['Loading frame']);
       }
@@ -749,14 +832,14 @@
         if (zm.ok) {
           const sc = half / 640;
           ctx.drawImage(zm.img, R.x, R.y, half, half);
+          chip(ctx, half < 300 ? `${view.zoom.factor || 3}× look-closer` : [[`${view.zoom.factor || 3}× look-closer`, 700], [' · detector re-run', 400]], R.x + 8, R.y + 8, C.title, '#ffffff', R, fs);
           if (state.opts.eval && view.zoom.truth_box) drawTruth(ctx, view.zoom.truth_box, view, R.x, R.y, sc, R, fs);
           drawBoxes(ctx, view.zoom.detections || [], view, R.x, R.y, sc, R, fs);
-          chip(ctx, `${view.zoom.factor || 3}× look closer: detector re-run`, R.x + 6, R.y + 6, '#ffffff', C.ink, R, fs);
         } else say(R, [zm.err ? 'Zoom tile not exported' : 'Loading zoom tile']);
       } else if (view && !view.bare) {
-        say(R, ['No look-closer at this step', 'Hikers zoom 3× when a report is uncertain', 'or a teammate reports a sighting']);
+        say(R, ['No 3× tile for this frame', "Triggered by an uncertain report or a teammate's sighting."]);
       } else if (view) {
-        say(R, ['Detections not exported', 'for this frame']);
+        say(R, ['Detections not exported']);
       }
     }
     // caption (text only changes with the step or the evaluator view)
@@ -764,35 +847,39 @@
     if (p.capKey === capKey) return;
     p.capKey = capKey;
     p.camCap.innerHTML = camCaption(ep, sel, view, t);
-    p.cam.setAttribute('aria-label', view ? `${hName(sel)} camera frame at step ${view.t}` : `${hName(sel)}: no camera frame yet`);
+    p.cam.setAttribute('aria-label', view ? `${hName(sel)} camera frame at step ${view.t}` : `${hName(sel)}: no frame yet`);
   }
   function detList(dets) {
-    if (!dets || !dets.length) return `nothing above ${DET_MIN}`;
+    if (!dets || !dets.length) return `none above ${DET_MIN}`;
     return [...dets].sort((a, b) => b.score - a.score).slice(0, 3).map(d => `${esc(d.cls)} ${f2(d.score)}`).join(', ');
   }
   function camCaption(ep, sel, view, t) {
     const stepS = ep.cfg.step_seconds;
-    const who = `<span class="who">${hDot(sel)}${hName(sel)}'s camera</span>`;
-    if (!view) return `${who} · no frame yet`;
+    const who = `<span class="who">${hDot(sel)}${hName(sel)} camera</span>`;
+    const row = (html, cls = '') => `<span class="cap-row${cls ? ` ${cls}` : ''}">${html}</span>`;
+    if (!view) return row(`${who} · no frame yet`);
     const age = t - view.t;
-    const when = `step ${view.t} (${clock(view.t, stepS)})${age > 0 ? `, ${plural(age, 'step')} ago` : ''}`;
-    if (view.bare || !view.detections) return `${who} · ${when} · detections were not exported for this frame`;
-    let s = `${who} · ${when} · YOLOX: ${detList(view.detections)}`;
-    if (view.zoom) s += ` · 3× tile: ${detList(view.zoom.detections)}`;
+    const when = `step ${view.t}${age > 0 ? `, ${plural(age, 'step')} ago` : ''}`;
+    if (view.bare || !view.detections) return row(`${who} · ${when} · detections not exported`);
+    let s = row(`${who} · ${when} · YOLOX-s (cv2.dnn): ${detList(view.detections)}${view.zoom ? ` · 3× tile: ${detList(view.zoom.detections)}` : ''}`);
     if (state.opts.eval) {
+      // a detection is only "true" when it matches the predator; matching a decoy is still a false alarm
       const all = [...view.detections, ...(view.zoom ? view.zoom.detections || [] : [])];
       const tp = all.filter(d => d.matches_truth && view.kind === 'real').length;
-      const fp = all.length - tp;
-      const what = view.kind === 'real' ? `predator at ${Math.round(view.distance_m)} m` : view.kind === 'decoy' ? `decoy at ${Math.round(view.distance_m)} m` : 'no animal in view';
-      s += `<br>Evaluator: ${what}`;
-      if (tp) s += ` · <span class="tp">${plural(tp, 'true detection')}</span>`;
-      if (fp) s += ` · <span class="fp">${plural(fp, 'false positive')}</span>`;
-      if (view.kind === 'real' && !tp) s += ' · predator not detected';
+      const onDecoy = all.filter(d => d.matches_truth && view.kind === 'decoy').length;
+      const fp = all.length - tp - onDecoy;
+      const what = view.kind === 'real' ? `predator at ${Math.round(view.distance_m)} m` : view.kind === 'decoy' ? `decoy at ${Math.round(view.distance_m)} m, no predator` : 'no animal in view';
+      let e = `<b>Evaluator</b> ${what}`;
+      if (tp) e += ` · <span class="tp">${plural(tp, 'true detection')}</span>`;
+      if (onDecoy) e += ` · <span class="fp">${onDecoy} on decoy</span>`;
+      if (fp) e += ` · <span class="fp">${plural(fp, 'false positive')}</span>`;
+      if (view.kind === 'real' && !tp) e += ' · predator not detected';
+      s += row(e, 'eval');
     }
     if (view.render_agrees === false) {
-      s += view.sim_detected
-        ? '<span class="note">This sample render disagrees with the simulator: its calibrated draw counted a detection here; this render\'s detector did not fire.</span>'
-        : '<span class="note">This sample render disagrees with the simulator: its calibrated draw missed the predator here; this render\'s detector found it.</span>';
+      s += row(view.sim_detected
+        ? '<b>Render disagrees with the run:</b> the calibrated draw detected the predator; this render does not.'
+        : '<b>Render disagrees with the run:</b> the calibrated draw missed the predator; this render detects it.', 'note');
     }
     return s;
   }
@@ -813,6 +900,7 @@
     updateRoster(t);
     updateLog(t);
     $('#scrub').value = t;
+    $('#scrub').style.setProperty('--p', `${(100 * t / Math.max(1, state.T)).toFixed(2)}%`);   // CSSOM, allowed under CSP
     $('#scrub').setAttribute('aria-valuetext', `step ${t}, ${clock(t, state.L.cfg.step_seconds)}`);
     $('#clockT').textContent = `step ${t}`;
     $('#clockM').textContent = clock(t, state.L.cfg.step_seconds);
@@ -823,15 +911,15 @@
     if (!show) {
       const c = countsAt(ep, t);
       big = `${c.out} of ${n} out so far`;
-      sub = c.caught ? `${c.caught} intercepted so far` : 'outcome shown at the end';
+      sub = c.caught ? `${c.caught} intercepted so far` : 'outcome hidden until the end';
       cls = 'pending';
     } else {
-      big = ep.nOut === n ? `All ${n} got out` : `${ep.nOut} of ${n} got out`;
+      big = ep.nOut === n ? `All ${n} reached an exit` : `${ep.nOut} of ${n} reached an exit`;
       const parts = [];
       if (ep.nCaught) parts.push(`${ep.nCaught} intercepted`);
-      if (ep.nLost) parts.push(`${ep.nLost} still lost at ${clock(ep.cfg.t_max, stepS)}`);
-      if (ep.nOut === n) parts.push(`all out by ${clock(ep.tEnd, stepS)}`);
-      if (ep.metrics.n_sightings_real === 0) parts.push('no hiker ever saw the predator');
+      if (ep.nLost) parts.push(`${ep.nLost} still lost at time limit (${clock(ep.cfg.t_max, stepS)})`);
+      if (ep.nOut === n) parts.push(`last exit at ${clock(ep.tEnd, stepS)}`);
+      if (ep.metrics.n_sightings_real === 0) parts.push('0 real sightings');
       else if (ep.metrics.n_sightings_real > 0) parts.push(`${plural(ep.metrics.n_sightings_real, 'real sighting')}`);
       sub = parts.join(' · ');
       cls = 'done';
@@ -842,9 +930,9 @@
   function updateBadges(p, ep) {
     const sel = clamp(state.sel, 0, ep.nh - 1);
     const parts = [];
-    if (state.opts.map && ep.ownSeen) parts.push(`<span class="badge">${hDot(sel)}${hName(sel)}'s own map</span>`);
-    if (state.opts.risk) parts.push(`<span class="badge">Risk: ${ep.cfg.private_sightings ? `${hName(sel)}'s evidence` : 'shared evidence'}</span>`);
-    if (state.opts.eval) parts.push('<span class="badge eval">Evaluator view: ground truth shown</span>');
+    if (state.opts.map && ep.ownSeen) parts.push(`<span class="badge">${hDot(sel)}${hName(sel)} private map</span>`);
+    if (state.opts.risk) parts.push(`<span class="badge">Risk: ${ep.cfg.private_sightings ? `${hName(sel)} evidence only` : 'shared evidence'}</span>`);
+    if (state.opts.eval) parts.push('<span class="badge eval">Evaluator view: ground truth</span>');
     const html = parts.join('');
     if (p.badgeHtml !== html) { p.badges.innerHTML = html; p.badgeHtml = html; }
   }
@@ -852,13 +940,13 @@
     const { L, R } = state;
     const shown = state.reveal === 'always' || (t >= L.tEnd && t >= R.tEnd);
     const same = L.raw.seed === R.raw.seed;
-    const sub = same ? `Same forest, same start, same predator start: seed ${esc(L.raw.seed)}.` : 'Different seeds: not a paired comparison.';
+    const sub = same ? `Paired by seed ${esc(L.raw.seed)}: same forest, hiker start and predator start.` : 'Different seeds: unpaired comparison.';
     let head;
-    if (!shown) head = 'Outcome shown at the end';
+    if (!shown) head = 'Outcome hidden until the end';
     else {
       const d = R.nOut - L.nOut;
       head = d === 0 ? 'Same outcome in both runs'
-        : `${d > 0 ? '+' : '−'}${plural(Math.abs(d), 'hiker')} got out with ${esc(lower(d > 0 ? R.label : L.label))}`;
+        : `+${plural(Math.abs(d), 'hiker')} out with ${esc(lower(d > 0 ? R.label : L.label))}`;
     }
     const html = `<strong>${head}</strong><span>${sub}</span>`;
     if (state.verdictHtml !== html) { $('#verdict').innerHTML = html; state.verdictHtml = html; }
@@ -897,20 +985,20 @@
     const n2 = v => `<span class="num">${f2(v)}</span>`;
     const tagS = s => (state.opts.eval && s ? (s.real ? '<span class="tag real">real</span>' : '<span class="tag false">false cue</span>') : '');
     switch (ev.kind) {
-      case 'sighting': return { cls: 'minor', html: `${who}<span>reported something,</span>${n2(ev.s.conf)}${tagS(ev.s)}` };
+      case 'sighting': return { cls: 'minor', html: `${who}<span>report, confidence</span>${n2(ev.s.conf)}${tagS(ev.s)}` };
       case 'relook': {
         const res = ev.after <= 0 ? '<span>· dismissed</span>' : (ev.after >= 0.75 ? '<span>· confirmed</span>' : '');
-        return { cls: '', html: `${who}<span>looked closer:</span>${n2(ev.before)}<span>→</span>${n2(ev.after)}${res}${tagS(ev.s)}` };
+        return { cls: '', html: `${who}<span>look closer:</span>${n2(ev.before)}<span>→</span>${n2(ev.after)}${res}${tagS(ev.s)}` };
       }
-      case 'scan': return { cls: ev.found ? 'major' : 'minor', html: `${who}<span>scanned with 3× zoom after a teammate's report ·</span><span>${ev.found ? 'found it' : 'nothing found'}</span>` };
-      case 'escape': return { cls: 'major', html: `${who}<span>decided to escape</span><span>(alarm ${f2(ev.alarm)}, threshold ${esc(ep.cfg.escape_threshold)})</span>` };
-      case 'home': return { cls: '', html: `${who}<span>heads home, walk time over</span>` };
-      case 'mode': return { cls: 'major', html: `${who}<span>${ev.mode === 'escape' ? 'joins the group escape' : 'heads home'}</span>` };
-      case 'escaped': return { cls: 'major', html: `${who}<span>got out</span>` };
-      case 'caught': return { cls: 'major', html: `${who}<span>was intercepted</span>` };
+      case 'scan': return { cls: ev.found ? 'major' : 'minor', html: `${who}<span>3× scan after teammate report ·</span><span>${ev.found ? 'detection' : 'no detection'}</span>` };
+      case 'escape': return { cls: 'major', html: `${who}<span>escape decision</span><span>(alarm ${f2(ev.alarm)}, threshold ${esc(ep.cfg.escape_threshold)})</span>` };
+      case 'home': return { cls: '', html: `${who}<span>heading home: walk time elapsed</span>` };
+      case 'mode': return { cls: 'major', html: `${who}<span>${ev.mode === 'escape' ? 'joins group escape' : 'heading home'}</span>` };
+      case 'escaped': return { cls: 'major', html: `${who}<span>reached an exit</span>` };
+      case 'caught': return { cls: 'major', html: `${who}<span>intercepted</span>` };
       case 'predator': {
         const txt = ev.state === 'patrol'
-          ? (ev.from === 'handling' ? 'Predator resumed patrolling' : 'Predator lost the trail')
+          ? (ev.from === 'handling' ? 'Predator resumed patrol' : 'Predator lost the trail')
           : ({ pursue: 'Predator picked up a trail', handling: 'Predator paused' }[ev.state] || esc(ev.state));
         return { cls: ev.state === 'pursue' ? '' : 'minor', html: `<span class="pred-mark" aria-hidden="true"></span><span>${txt}</span>` };
       }
@@ -933,7 +1021,7 @@
       return `<li class="${cls}${ev.t === fresh ? ' fresh' : ''}"><button type="button" class="row" data-t="${ev.t}" data-h="${ev.h}">` +
         `<span class="lt">${clock(ev.t, p.ep.cfg.step_seconds)}</span><span class="side-key" title="${esc(p.ep.label)}">${p.side}</span><span class="lx">${html}</span></button></li>`;
     }).join('');
-    const out = html || '<li class="empty">Nothing yet. Press Space to play.</li>';
+    const out = html || '<li class="empty">No events yet. Press Space to play.</li>';
     if (state.logHtml !== out) { $('#log').innerHTML = out; state.logHtml = out; }
   }
   $('#log').addEventListener('click', e => {
@@ -946,23 +1034,32 @@
   });
   function updateToasts(p, ep, t) {
     const items = [];
+    const railed = document.body.classList.contains('railed');     // a rail beside the map holds more, for longer
+    const keep = railed ? 4 * TOAST_STEPS : TOAST_STEPS, maxN = railed ? 6 : 3;
     for (const ev of ep.events) {
       if (ev.t > t) break;
-      if (t - ev.t >= TOAST_STEPS) continue;
+      if (t - ev.t >= keep) continue;
       let text = null;
-      if (ev.kind === 'escape' || (ev.kind === 'mode' && ev.mode === 'escape')) text = `${hName(ev.h)} decides to escape`;
+      if (ev.kind === 'escape' || (ev.kind === 'mode' && ev.mode === 'escape')) text = `${hName(ev.h)} escape decision`;
       else if (ev.kind === 'caught') text = `${hName(ev.h)} intercepted`;
-      else if (ev.kind === 'escaped') text = `${hName(ev.h)} got out`;
+      else if (ev.kind === 'escaped') text = `${hName(ev.h)} reached an exit`;
       else if (ev.kind === 'predator' && ev.state === 'pursue') text = 'Predator picked up a trail';
-      else if (ev.kind === 'relook' && ev.after >= 0.75) text = `${hName(ev.h)} looked closer: ${f2(ev.before)} → ${f2(ev.after)}`;
-      else if (ev.kind === 'scan' && ev.found) text = `${hName(ev.h)} scanned and found it`;
+      else if (ev.kind === 'relook' && ev.after >= 0.75) text = `${hName(ev.h)} look closer: ${f2(ev.before)} → ${f2(ev.after)}`;
+      else if (ev.kind === 'scan' && ev.found) text = `${hName(ev.h)} 3× scan: detection`;
       if (text) items.push({ ev, text });
     }
-    const html = items.slice(-3).map(({ ev, text }) => {
+    const prev = p.toastKeys || new Set(), keys = new Set();
+    const html = items.slice(-maxN).map(({ ev, text }) => {
       const mark = ev.h >= 0 ? hDot(ev.h) : '<span class="pred-mark"></span>';
-      return `<li>${mark}${esc(text)}</li>`;
+      const key = `${ev.t}|${ev.kind}|${ev.h}`;
+      keys.add(key);
+      // only an event that just arrived during playback slides in; everything else is drawn in place
+      const cls = [t - ev.t >= TOAST_STEPS ? 'old' : '', state.playing && !prev.has(key) ? 'in' : ''].filter(Boolean).join(' ');
+      return `<li class="${cls}" data-k="${esc(key)}">${mark}<span class="tx">${esc(text)}</span><span class="tt">${clock(ev.t, ep.cfg.step_seconds)}</span></li>`;
     }).join('');
-    if (p.toastHtml !== html) { p.toasts.innerHTML = html; p.toastHtml = html; }
+    p.toastKeys = keys;
+    const cmp = html.replace(/ in"/g, '"').replace(/class="in"/g, 'class=""');
+    if (p.toastCmp !== cmp) { p.toasts.innerHTML = html; p.toastCmp = cmp; }
   }
   function buildTicks() {
     const el = $('#ticks'), T = Math.max(1, state.T);
@@ -1017,36 +1114,62 @@
   function buildLegend() {
     const terrain = (pal, k) => `rgb(${TERRAIN[pal][k].join(',')})`;
     fillLegend($('#legend'), [
-      ['Hiker, enjoying the walk', (c, x, y) => drawHiker(c, x, y, 9, 0, 'enjoy', false, 0)],
+      ['Hiker, walking', (c, x, y) => drawHiker(c, x, y, 9, 0, 'enjoy', false, 0)],
       ['Escaping to an exit', (c, x, y) => drawHiker(c, x, y, 7.5, 1, 'escape', false, 0)],
       ['Heading home', (c, x, y) => drawHiker(c, x, y, 7.5, 2, 'home', false, 0)],
-      ['Got out', (c, x, y) => drawHiker(c, x, y, 9, 3, 'escaped', false, 0)],
+      ['Reached an exit', (c, x, y) => drawHiker(c, x, y, 9, 3, 'escaped', false, 0)],
       ['Intercepted (leaves the map)', (c, x, y) => drawHiker(c, x, y, 9, 0, 'caught', false, 0)],
-      ['Followed hiker (its camera is shown)', (c, x, y) => drawHiker(c, x, y, 5, 0, 'enjoy', true, 0)],
+      ['Selected hiker (camera shown)', (c, x, y) => drawHiker(c, x, y, 5, 0, 'enjoy', true, 0)],
       ['Predator', (c, x, y) => { c.beginPath(); c.moveTo(x, y - 9); c.lineTo(x + 9, y); c.lineTo(x, y + 9); c.lineTo(x - 9, y); c.closePath(); c.fillStyle = C.predator; c.fill(); c.strokeStyle = C.ink; c.lineWidth = 1.5; c.stroke(); }],
       ['Predator sensing radius', (c, x, y) => { c.setLineDash([4, 3]); c.strokeStyle = C.predator; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, 11, 0, 2 * Math.PI); c.stroke(); }],
-      ['Report (fades as it ages)', (c, x, y) => drawSighting(c, x, y, 9, {}, 0.9, 99, false)],
-      ['Real sighting (evaluator view)', (c, x, y) => drawSighting(c, x, y, 9, { real: true }, 1, 99, true)],
-      ['False cue (evaluator view)', (c, x, y) => drawSighting(c, x, y, 9, { real: false }, 1, 99, true)],
+      ['Report (fades with age)', (c, x, y) => drawSighting(c, x, y, 9, {}, 0.9, 99, false)],
+      ['Real sighting (evaluator)', (c, x, y) => drawSighting(c, x, y, 9, { real: true }, 1, 99, true)],
+      ['False cue (evaluator)', (c, x, y) => drawSighting(c, x, y, 9, { real: false }, 1, 99, true)],
       ['Exit', (c, x, y) => { c.fillStyle = C.ink; c.fillRect(x - 9, y - 9, 18, 18); c.fillStyle = C.paper; c.fillRect(x - 3, y - 4.5, 6, 9); }],
-      ['Explored ground and trees', (c, x, y) => { c.fillStyle = terrain('ground', 1); c.fillRect(x - 12, y - 9, 12, 18); c.fillStyle = terrain('trees', 1); c.fillRect(x, y - 9, 12, 18); c.strokeStyle = C.rule; c.strokeRect(x - 12.5, y - 9.5, 25, 19); }],
-      ['Not seen yet', (c, x, y) => { c.fillStyle = terrain('ground', 0); c.fillRect(x - 12, y - 9, 12, 18); c.fillStyle = terrain('trees', 0); c.fillRect(x, y - 9, 12, 18); }],
-      ['Risk from fading evidence', (c, x, y) => { for (let r = 12; r > 0; r -= 2) { c.fillStyle = `rgba(230,${Math.round(110 + 5 * r)},0,${(0.75 * (1 - r / 13)).toFixed(2)})`; c.beginPath(); c.arc(x, y, r, 0, 2 * Math.PI); c.fill(); } }],
+      ['Explored: ground, trees', (c, x, y) => { c.fillStyle = terrain('ground', 1); c.fillRect(x - 12, y - 9, 12, 18); c.fillStyle = terrain('trees', 1); c.fillRect(x, y - 9, 12, 18); c.strokeStyle = C.rule; c.strokeRect(x - 12.5, y - 9.5, 25, 19); }],
+      ['Unexplored', (c, x, y) => { c.fillStyle = terrain('ground', 0); c.fillRect(x - 12, y - 9, 12, 18); c.fillStyle = terrain('trees', 0); c.fillRect(x, y - 9, 12, 18); }],
+      ['Risk (decaying evidence)', (c, x, y) => { for (let r = 12; r > 0; r -= 2) { c.fillStyle = `rgba(230,${Math.round(110 + 5 * r)},0,${(0.75 * (1 - r / 13)).toFixed(2)})`; c.beginPath(); c.arc(x, y, r, 0, 2 * Math.PI); c.fill(); } }],
     ]);
+    buildMiniKey();
     const box = (col, dash) => (c, x, y) => { c.fillStyle = C.well; c.fillRect(x - 15, y - 15, 30, 30); c.strokeStyle = col; c.lineWidth = 2; if (dash) c.setLineDash([4, 3]); c.strokeRect(x - 9, y - 8, 18, 16); };
     fillLegend($('#legendCam'), [
-      ['Detection, as the hiker sees it', box(C.report)],
-      ['Detection that is the predator (evaluator)', box(C.predator)],
-      ['False positive (evaluator)', box('#ffffff', true)],
-      ['Where the object really is (evaluator)', (c, x, y) => { c.fillStyle = C.well; c.fillRect(x - 15, y - 15, 30, 30); c.strokeStyle = C.truth; c.lineWidth = 2; c.beginPath(); for (const [cx, cy, dx, dy] of [[x - 8, y - 8, 1, 1], [x + 8, y - 8, -1, 1], [x - 8, y + 8, 1, -1], [x + 8, y + 8, -1, -1]]) { c.moveTo(cx + dx * 5, cy); c.lineTo(cx, cy); c.lineTo(cx, cy + dy * 5); } c.stroke(); }],
-      ['Region re-run at 3× (look closer)', (c, x, y) => { c.fillStyle = C.well; c.fillRect(x - 15, y - 15, 30, 30); c.strokeStyle = '#ffffff'; c.lineWidth = 1.5; c.strokeRect(x - 11, y - 3, 9, 9); c.lineWidth = 1; c.beginPath(); c.moveTo(x - 2, y - 3); c.lineTo(x + 14, y - 13); c.moveTo(x - 2, y + 6); c.lineTo(x + 14, y + 14); c.stroke(); }],
+      ['Detection (hiker view)', box(C.report)],
+      ['True detection: predator (evaluator)', box(C.predator)],
+      ['False positive or decoy (evaluator)', box('#ffffff', true)],
+      ['Ground-truth location (evaluator)', (c, x, y) => { c.fillStyle = C.well; c.fillRect(x - 15, y - 15, 30, 30); c.strokeStyle = C.truth; c.lineWidth = 2; c.beginPath(); for (const [cx, cy, dx, dy] of [[x - 8, y - 8, 1, 1], [x + 8, y - 8, -1, 1], [x - 8, y + 8, 1, -1], [x + 8, y + 8, -1, -1]]) { c.moveTo(cx + dx * 5, cy); c.lineTo(cx, cy); c.lineTo(cx, cy + dy * 5); } c.stroke(); }],
+      ['Look-closer region (re-run at 3×)', (c, x, y) => { c.fillStyle = C.well; c.fillRect(x - 15, y - 15, 30, 30); c.strokeStyle = '#ffffff'; c.lineWidth = 1.5; c.strokeRect(x - 11, y - 3, 9, 9); c.lineWidth = 1; c.beginPath(); c.moveTo(x - 2, y - 3); c.lineTo(x + 14, y - 13); c.moveTo(x - 2, y + 6); c.lineTo(x + 14, y + 14); c.stroke(); }],
     ]);
   }
+  // the compact key beside the board: the map marks a viewer meets first, evaluator marks only in that view
+  function buildMiniKey() {
+    const ul = $('#miniKey');
+    if (!ul) return;
+    const diamond = (c, x, y) => { c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 7, y); c.lineTo(x, y + 7); c.lineTo(x - 7, y); c.closePath(); c.fillStyle = C.predator; c.fill(); c.strokeStyle = C.ink; c.lineWidth = 1.4; c.stroke(); };
+    const items = [
+      ['Hiker, walking', (c, x, y) => drawHiker(c, x, y, 7, 0, 'enjoy', false, 0)],
+      ['Escaping to an exit', (c, x, y) => drawHiker(c, x, y, 5.5, 1, 'escape', false, 0)],
+      ['Reached an exit', (c, x, y) => drawHiker(c, x, y, 7, 3, 'escaped', false, 0)],
+      ['Intercepted', (c, x, y) => drawHiker(c, x, y, 7, 0, 'caught', false, 0)],
+      ['Predator', diamond],
+      ['Predator sensing radius', (c, x, y) => { c.setLineDash([3, 2.5]); c.strokeStyle = C.predator; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, 8, 0, 2 * Math.PI); c.stroke(); }],
+      ...(state.opts.eval
+        ? [['Real sighting (evaluator)', (c, x, y) => drawSighting(c, x, y, 7, { real: true }, 1, 99, true)],
+          ['False cue (evaluator)', (c, x, y) => drawSighting(c, x, y, 7, { real: false }, 1, 99, true)]]
+        : [['Report (fades with age)', (c, x, y) => drawSighting(c, x, y, 7, {}, 0.9, 99, false)]]),
+      ['Exit', (c, x, y) => { c.fillStyle = C.ink; c.fillRect(x - 7, y - 7, 14, 14); c.fillStyle = C.paper; c.fillRect(x - 2.5, y - 3.5, 5, 7); }],
+    ];
+    ul.textContent = '';
+    for (const [text, draw] of items) {
+      const li = document.createElement('li');
+      li.append(swatch(draw, 22, 22), document.createTextNode(text));
+      ul.append(li);
+    }
+  }
   const KEYS = [
-    ['Space', 'play or pause'], ['← →', 'step (Shift: 10 steps)'], ['Home End', 'start, end'], ['↑ ↓', 'faster, slower'],
-    ['1–4', 'follow a hiker: its camera, and its own map when maps are private'], ['E', 'evaluator view: real against false sightings and boxes'],
-    ['R S T M', 'risk, sense ring, routes, living map'], ['O', 'outcome always shown, or revealed at the end'],
-    ['F', 'skip quiet stretches (5× when nothing happens)'], ['C', 'capture mode: hide controls for recording'], ['?', 'this list'],
+    ['Space', 'Play / pause'], ['← →', 'Step (Shift: 10 steps)'], ['Home End', 'Start / end'], ['↑ ↓', 'Speed up / down'],
+    ['1–4', 'Select hiker (camera; own map when maps are private)'], ['E', 'Evaluator view: ground truth for sightings and boxes'],
+    ['R S T M', 'Risk, sense ring, routes, living map'], ['O', 'Outcome: always shown / revealed at end'],
+    ['F', 'Skip idle stretches at 5×'], ['C', 'Capture mode (hide controls)'], ['?', 'Keyboard help'],
   ];
   function buildKeys() {
     const html = KEYS.map(([k, d]) => `<dt>${k.split(' ').map(x => `<kbd>${esc(x)}</kbd>`).join(' ')}</dt><dd>${esc(d)}</dd>`).join('');
@@ -1063,7 +1186,9 @@
     $('#headline').innerHTML = items.map(x =>
       `<div><dt>${esc(x.label)}</dt><dd><span class="v">${esc(x.value)}</span>${x.note ? `<span class="n">${esc(x.note)}</span>` : ''}</dd></div>`).join('');
     if (typeof r.figure === 'string' && !/^[a-z]+:|^\/\//i.test(r.figure)) {
-      const img = $('#findingsImg');
+      const img = new Image();
+      img.id = 'findingsImg'; img.decoding = 'async';
+      $('#findingsFig').prepend(img);
       img.src = `data/${r.figure.replace(/^\.?\//, '')}`;
       img.alt = r.figure_alt || 'Experiment figure';
       $('#findingsCap').textContent = r.figure_caption || '';
@@ -1090,6 +1215,17 @@
     } catch (_) { return []; }
   }
   async function loadAgent() {
+    // Preferred: data/agent/index.json {model, source, traces: [{point, title, note, llm, rule, frame, prev_frame}]}
+    let idx = null;
+    try { idx = await getJSON('data/agent/index.json'); } catch (_) { /* optional */ }
+    if (idx && Array.isArray(idx.traces) && idx.traces.length) {
+      const points = (await Promise.all(idx.traces.map(async tr => {
+        const get = async f => { if (typeof f !== 'string' || !f) return null; try { return await getJSON(`data/agent/${encodeURIComponent(f)}`); } catch (_) { return null; } };
+        const [llm, rule] = await Promise.all([get(tr.llm), get(tr.rule)]);
+        return llm || rule ? { tr, llm, rule } : null;
+      }))).filter(Boolean);
+      if (points.length) { renderPoints(points, idx); return; }
+    }
     const files = (await listAgentFiles()).slice(0, 200);
     const decisions = [];
     await Promise.all(files.map(async f => {
@@ -1117,16 +1253,16 @@
     if (!decs.length) {
       body.innerHTML = `<div class="agent-empty">
         <div>
-          <p>No agent run is loaded yet. This panel reads decision traces that <code>lost_together/agent/loop.py</code> writes, copied into <code>viewer/data/agent/</code>. Live traces arrive after the GPU run.</p>
-          <p class="muted">Each trace will show what one hiker's agent saw, which OpenCV 5 tools it called, what it decided, and what the ranger did with that decision. Nothing is shown until a real trace exists.</p>
+          <p>No agent traces loaded. Source: decision traces written by <code>lost_together/agent/loop.py</code>, copied to <code>viewer/data/agent/</code>. Live traces follow the GPU run.</p>
+          <p class="muted">Each trace records one hiker's observation, OpenCV 5 tool calls, decision and ranger action. Only real traces are shown.</p>
         </div>
-        <ol class="loop" aria-label="What a trace contains">
-          <li><b>Observe</b><span>The hiker's frame with numbered OpenCV detection candidates and a summary of the shared map.</span></li>
-          <li><b>Model turn</b><span>qwen3-vl on an AWS GPU reads them and may ask for tools.</span></li>
-          <li><b>OpenCV 5 tools</b><span><code>look_closer</code> re-runs the detector on a zoomed, defogged crop; <code>compare_frames</code> measures motion; <code>query_map</code> reads the living map. Served by the MCP server.</span></li>
-          <li><b>Decision</b><span>Keep going, look again, regroup or escape, checked against a strict format.</span></li>
-          <li><b>Fallback</b><span>On a timeout or an invalid answer the hiker uses the rule-based planner, and the reason is recorded.</span></li>
-          <li><b>Ranger</b><span>An escape order is an evacuation broadcast: a person approves or overrides it, and the choice is logged.</span></li>
+        <ol class="loop" aria-label="Trace contents">
+          <li><b>Observe</b><span>Hiker frame with numbered OpenCV detection candidates, plus a shared-map summary.</span></li>
+          <li><b>Model turn</b><span>qwen3-vl on an AWS GPU reads the observation and may request tools.</span></li>
+          <li><b>OpenCV 5 tools</b><span><code>look_closer</code>: re-detect on a zoomed, defogged crop. <code>compare_frames</code>: motion. <code>query_map</code>: living map. Served by the MCP server.</span></li>
+          <li><b>Decision</b><span>Keep going, look again, regroup or escape; validated against a strict format.</span></li>
+          <li><b>Fallback</b><span>On timeout or invalid output, the rule-based planner decides; the reason is logged.</span></li>
+          <li><b>Ranger</b><span>Escape orders are evacuation broadcasts; a person approves or overrides each one, and the choice is logged.</span></li>
         </ol>
       </div>`;
       return;
@@ -1138,7 +1274,7 @@
           const d = x.d, act = d.action || d.decision;
           return `<li><button type="button" class="dec-btn" data-i="${i}" aria-current="${i === 0}">
             <span class="pid">${esc(d.point_id)}</span>
-            <span class="pol">${d.policy === 'rule' ? 'rule-based planner' : `${esc(d.policy)} agent`}${d.source === 'fallback' ? ' · fell back to the rule' : ''}</span>
+            <span class="pol">${d.policy === 'rule' ? 'rule-based planner' : `${esc(d.policy)} agent`}${d.source === 'fallback' ? ' · rule fallback' : ''}</span>
             <span class="act"><span class="act-chip ${act === 'escape' ? 'escape' : ''}">${esc(DEC_LABEL[act] || act)}</span></span></button></li>`;
         }).join('')}</ol>
         <div id="decDetail"></div>
@@ -1150,12 +1286,92 @@
     $('#decList').addEventListener('click', e => { const b = e.target.closest('.dec-btn'); if (b) show(Number(b.dataset.i)); });
     show(0);
   }
+  // ----- decision points: the same frame decided by the LLM agent and by the rule-based planner -----
+  const actOf = d => (d ? d.action || d.decision : null);
+  const actChip = a => `<span class="act-chip ${a === 'escape' ? 'escape' : ''}">${esc(DEC_LABEL[a] || a || 'none')}</span>`;
+  function renderPoints(points, idx) {
+    const body = $('#agentBody');
+    const model = idx.model || (points[0].llm && points[0].llm.model) || null;
+    const stub = /stub/i.test(`${model || ''} ${idx.source || ''}`);
+    body.innerHTML = `${stub ? '<p class="stub-banner">Pipeline demo with a stub model, not a result.</p>' : ''}
+      <p class="agent-lede">${['One decision point', 'Two decision points', 'Three decision points', 'Four decision points'][points.length - 1] || `${points.length} decision points`} from the live agent run${model ? ` (<b>${esc(model)}</b>, AWS GPU)` : ''}. Tools reference OpenCV 5 detection candidates by number; the rule-based planner decided the same frames. Tool calls, model turns and approvals are copied from the trace${idx.source ? ` (<code>${esc(idx.source)}</code>)` : ''}.</p>
+      <div class="agent-grid">
+        <ol class="dec-list" id="decList">${points.map((x, i) => `<li><button type="button" class="dec-btn" data-i="${i}" aria-current="${i === 0}">
+            <span class="pid">${esc(x.tr.title || x.tr.point)}</span>
+            <span class="pol">${esc(x.tr.point)}</span>
+            <span class="vs"><span>Agent ${actChip(actOf(x.llm))}</span><span>Rule ${actChip(actOf(x.rule))}</span></span></button></li>`).join('')}</ol>
+        <div id="decDetail" class="dec-detail" aria-live="polite"></div>
+      </div>`;
+    const show = i => {
+      $$('#decList .dec-btn').forEach(b => b.setAttribute('aria-current', String(Number(b.dataset.i) === i)));
+      $('#decDetail').innerHTML = pointHTML(points[i], model);
+      drawPointFrame($('#decDetail canvas'), points[i]);
+    };
+    $('#decList').addEventListener('click', e => { const b = e.target.closest('.dec-btn'); if (b) show(Number(b.dataset.i)); });
+    show(0);
+  }
+  function pointHTML(x, model) {
+    const tr = x.tr;
+    const side = (d, name) => {
+      if (!d) return `<section class="dec-col"><h3>${name}</h3><p class="dec-why">No trace for this policy.</p></section>`;
+      const meta = [
+        d.source === 'fallback' ? '<b>rule fallback</b>' : '',
+        d.llm_calls ? `${d.llm_calls} model calls` : '',
+        `${d.tool_calls ?? 0} tool calls`,
+        d.latency_s != null ? `${Number(d.latency_s).toFixed(2)} s` : '',
+        d.tokens_in ? `${d.tokens_in.toLocaleString('en')} tokens in` : '',
+      ].filter(Boolean).map(s => `<span>${s}</span>`).join('');
+      return `<section class="dec-col"><h3>${name} ${actChip(actOf(d))}</h3>
+        ${d.why ? `<p class="dec-why">“${esc(d.why)}”</p>` : ''}
+        ${d.fallback_reason ? `<p class="dec-why"><b>Rule fallback:</b> ${esc(d.fallback_reason)}</p>` : ''}
+        <p class="dec-meta">${meta}</p>
+        <ol class="steps">${d.trace.map(stepHTML).join('')}</ol></section>`;
+    };
+    return `<div class="dec-top">
+        <figure class="dec-frame"><canvas role="img" aria-label="Hiker camera frame with numbered detection candidates"></canvas>
+          <figcaption>Hiker frame with the numbered candidates the agent's tools reference. Dashed box: region re-run by <code>look_closer</code>.</figcaption></figure>
+        <div class="dec-story"><h3>${esc(tr.title || tr.point)}</h3>${tr.note ? `<p>${esc(tr.note)}</p>` : ''}<p class="pt">Point ${esc(tr.point)}</p></div>
+      </div>
+      <div class="dec-cols">${side(x.llm, model ? `LLM agent <small>${esc(model)}</small>` : 'LLM agent')}${side(x.rule, 'Rule-based planner')}</div>`;
+  }
+  function drawPointFrame(cv, x) {
+    if (!cv || typeof x.tr.frame !== 'string' || /^[a-z]+:|^\/|\.\./i.test(x.tr.frame)) { if (cv) cv.closest('figure').hidden = true; return; }
+    const d = x.llm || x.rule;
+    const obs = d && d.trace.find(s => s.kind === 'observe');
+    const cands = (obs && (obs.candidates || (obs.top ? [obs.top] : []))) || [];
+    const look = d && d.trace.find(s => s.kind === 'tool' && s.name === 'look_closer' && s.result && s.result.crop_box);
+    const img = new Image();
+    img.onload = () => {
+      const S = Math.round(cv.clientWidth || 420), dpr = window.devicePixelRatio || 1, sc = S / 640;
+      cv.width = cv.height = Math.round(S * dpr);
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.drawImage(img, 0, 0, S, S);
+      const B = { x: 0, y: 0, w: S, h: S }, fs = 13;
+      chip(ctx, [['Hiker camera', 700], [' · YOLOX and blob-search candidates', 400]], 8, 8, C.title, '#ffffff', B, fs);
+      if (look) {
+        const [bx, by, bw, bh] = look.result.crop_box;
+        ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(bx * sc - 3, by * sc - 3, bw * sc + 6, bh * sc + 6); ctx.restore();
+      }
+      for (const c of [...cands].sort((a, b) => a.score - b.score)) {
+        const x = Math.round(c.box[0] * sc), y = Math.round(c.box[1] * sc);
+        const w = Math.max(4, Math.round(c.box[2] * sc)), h = Math.max(4, Math.round(c.box[3] * sc));
+        ctx.lineWidth = 4; ctx.strokeStyle = C.casing; ctx.strokeRect(x, y, w, h);
+        ctx.lineWidth = 2; ctx.strokeStyle = C.report; ctx.strokeRect(x, y, w, h);
+        chip(ctx, [[`#${c.id} ${c.cls}`, 700], [` ${f2(c.score)}`, 400]], x - 1, y - 1 - (fs + 8), C.report, C.ink, B, fs);
+      }
+    };
+    img.onerror = () => { cv.closest('figure').hidden = true; };
+    img.src = `data/agent/${x.tr.frame.replace(/^\.?\//, '')}`;
+  }
+
   function decisionHTML(x) {
     const d = x.d, act = d.action || d.decision;
     const model = d.model || x.meta.model;
     const changed = d.action && d.action !== d.decision;
     const meta = [
-      model ? `Model: <b>${esc(model)}</b>` : 'Model: not recorded in this trace',
+      model ? `Model: <b>${esc(model)}</b>` : 'Model: not recorded',
       `source <b>${esc(d.source)}</b>`,
       `${d.tool_calls ?? 0} tool calls`, `${d.llm_calls ?? 0} model calls`,
       d.latency_s != null ? `<b>${Number(d.latency_s).toFixed(2)} s</b> total` : '',
@@ -1165,7 +1381,7 @@
     return `<div class="dec-head"><span class="big">${esc(DEC_LABEL[d.decision] || d.decision)}${changed ? ` → ${esc(DEC_LABEL[act] || act)}` : ''}</span>
       <span>${d.policy === 'rule' ? 'Rule-based planner' : `${esc(d.policy)} agent`} · point ${esc(d.point_id)}</span></div>
       ${d.why ? `<p class="dec-why">${esc(d.why)}</p>` : ''}
-      ${d.fallback_reason ? `<p class="dec-why"><b>Fell back to the rule:</b> ${esc(d.fallback_reason)}</p>` : ''}
+      ${d.fallback_reason ? `<p class="dec-why"><b>Rule fallback:</b> ${esc(d.fallback_reason)}</p>` : ''}
       <p class="dec-meta">${meta}</p>
       <ol class="steps">${d.trace.map(stepHTML).join('')}</ol>`;
   }
@@ -1177,12 +1393,12 @@
     switch (s.kind) {
       case 'observe': {
         const c = s.top;
-        const top = c ? `top candidate #${esc(c.id)}: ${esc(c.cls)} ${f2(c.score)}` : 'no candidates';
+        const top = c ? `top #${esc(c.id)}: ${esc(c.cls)} ${f2(c.score)}` : 'no candidates';
         const vis = s.frame && s.frame.visibility != null ? `<span class="sub">frame visibility ${f2(s.frame.visibility)}, haze ${f2(s.frame.haze)}</span>` : '';
         return row('Observe', `${esc(s.n_candidates ?? 0)} candidates from ${esc(s.detector || 'the detector')}, ${top}${vis}`);
       }
       case 'llm': {
-        const asked = Array.isArray(s.tool_calls) && s.tool_calls.length ? `asked for ${s.tool_calls.map(esc).join(', ')}` : (s.ok ? 'answered' : 'failed');
+        const asked = Array.isArray(s.tool_calls) && s.tool_calls.length ? `requested ${s.tool_calls.map(esc).join(', ')}` : (s.ok ? 'answered' : 'failed');
         const sub = `<span class="sub">${s.latency_s != null ? `${Number(s.latency_s).toFixed(2)} s` : ''}${s.cached ? ', cached' : ''}${s.tokens_in ? `, ${s.tokens_in} tokens in` : ''}${s.error ? `, ${esc(s.error)}` : ''}</span>`;
         return row('Model turn', `${asked}${sub}`, s.ok === false ? 'fallback' : '');
       }
@@ -1192,15 +1408,17 @@
         if (s.ok === false) d = `failed: ${esc(s.error || 'error')}`;
         else if (s.name === 'look_closer' && r.after) d = `#${esc(r.candidate_id)}: ${esc(r.before?.cls)} ${f2(r.before?.score ?? 0)} → ${esc(r.after.cls)} ${f2(r.after.score)}<span class="sub">zoom ${esc(r.zoom)}×${r.contrast_gain ? `, contrast gain ${esc(r.contrast_gain)}` : ''}</span>`;
         else if (s.name === 'compare_frames') d = `#${esc(r.candidate_id ?? '')} ${r.moving ? 'moving' : 'static'}${r.motion_px != null ? `, ${Number(r.motion_px).toFixed(1)} px` : ''}`;
-        else if (s.name === 'query_map') d = `risk near the hiker ${f2(r.risk_near_hiker ?? 0)}${r.nearest_exit ? `, nearest exit ${Math.round(r.nearest_exit.distance_m)} m` : ''}<span class="sub">${(r.recent_sightings || []).length} recent sightings by the group</span>`;
+        else if (s.name === 'query_map') d = `risk near hiker ${f2(r.risk_near_hiker ?? 0)}${r.nearest_exit ? `, nearest exit ${Math.round(r.nearest_exit.distance_m)} m` : ''}<span class="sub">${(r.recent_sightings || []).length} recent group sightings</span>`;
         else d = esc(JSON.stringify(r).slice(0, 160));
         return row(`Tool <small>${esc(s.name)}${s.by ? `, called by ${esc(s.by)}` : ''}</small>`, d, s.ok === false ? 'fallback' : '');
       }
-      case 'validate': return row('Validate', s.ok ? 'the answer has the required format' : `rejected: ${esc(s.error || '')}`, s.ok ? '' : 'fallback');
-      case 'fallback': return row('Fallback', `rule-based planner used: ${esc(s.reason || '')}`, 'fallback');
+      case 'validate': return row('Validate', s.ok ? 'format valid' : `rejected: ${esc(s.error || '')}`, s.ok ? '' : 'fallback');
+      case 'fallback': return row('Fallback', `rule-based planner: ${esc(s.reason || '')}`, 'fallback');
       case 'ranger': {
-        const a = s.approval || {};
-        return row('Ranger', `${esc(s.outcome || '')}${s.autonomy ? `<span class="sub">autonomy: ${esc(s.autonomy)}${a.by ? `, by ${esc(a.by)}` : ''}</span>` : ''}`, 'ranger');
+        const by = s.by || (s.approval || {}).by;
+        const auto = by === 'auto';
+        const what = auto ? `${esc(s.outcome || 'approved')} automatically (batch run, no human review)` : `${esc(s.outcome || '')}${by ? ` by ${esc(by)}` : ''}`;
+        return row('Ranger', `${what}${s.autonomy ? `<span class="sub">autonomy: ${esc(s.autonomy)}${s.note && !auto ? ` · ${esc(s.note)}` : ''}</span>` : ''}`, 'ranger');
       }
       default: return row(esc(s.kind || 'step'), esc(JSON.stringify(s).slice(0, 160)));
     }
@@ -1259,6 +1477,7 @@
   function toggle(k) {
     state.opts[k] = !state.opts[k];
     syncToggles();
+    if (k === 'eval') buildMiniKey();
     for (const p of panes) { p.baseKey = ''; p.riskKey = ''; p.camKey = ''; p.capKey = ''; }
     state.lastT = -1; state.dirty = true;
   }

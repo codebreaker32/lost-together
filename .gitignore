@@ -12,3 +12,6 @@ results/
 *.egg-info/
 .sweepbox/
 .gpubox/
+video/node_modules/
+video/out/
+video/public/*.mp4
