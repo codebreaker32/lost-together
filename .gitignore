@@ -15,3 +15,4 @@ results/
 video/node_modules/
 video/out/
 video/public/*.mp4
+video/voiceover/narration.wav

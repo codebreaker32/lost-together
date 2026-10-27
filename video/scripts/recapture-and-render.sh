@@ -21,5 +21,9 @@ npx remotion ffmpeg -hide_banner -loglevel error -y -framerate 30 -i "$TMP/frame
 # refresh the fogged hiker views used in the Hook/Idea scenes
 for h in 0 1 2 3; do cp "$ROOT/viewer/data/frames/seed45-share-sr1-R20-cal-b0.05/0_$h.jpg" "public/view0_$h.jpg"; done
 cp "$ROOT/viewer/data/frames/seed45-share-sr1-R20-cal-b0.05/80_0.jpg" public/forest_bg.jpg
-npx remotion render src/Root.tsx MainVideo out/lost-together-demo.mp4 --log=error --crf=18
+npx remotion render src/Root.tsx MainVideo out/lost-together-demo-captions-only.mp4 --log=error --crf=18
+# mux the Polly voiceover (voiceover/narration.wav, built from voiceover/lines/*.mp3 at the caption times)
+C=node_modules/@remotion/compositor-linux-x64-gnu
+LD_LIBRARY_PATH="$PWD/$C" "$C/ffmpeg" -hide_banner -loglevel error -y -i out/lost-together-demo-captions-only.mp4 -i voiceover/narration.wav \
+  -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -shortest out/lost-together-demo.mp4
 npx remotion still src/Root.tsx Hero out/thumbnail.png --frame=720 --log=error
